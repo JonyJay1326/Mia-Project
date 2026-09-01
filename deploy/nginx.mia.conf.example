@@ -1,0 +1,32 @@
+# 1Panel / Nginx 站点配置示例
+# - 静态文件：mia-web/dist
+# - /api 反代到 127.0.0.1:MIA_PORT（示例 3001）
+# - 可选 Basic Auth（与应用内登录叠加，挡扫描）
+
+server {
+  listen 80;
+  server_name 你的服务器IP;
+
+  # 可选：Nginx 层 Basic Auth（与应用登录不冲突，多一层防护）
+  # auth_basic "Mia";
+  # auth_basic_user_file /etc/nginx/.htpasswd;
+
+  root /opt/mia-project/mia-web/dist;
+  index index.html;
+
+  client_max_body_size 25m;
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:3001/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 120s;
+  }
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}

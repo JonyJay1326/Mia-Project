@@ -1,0 +1,210 @@
+/**
+ * 全局基础样式 + 糖果风通用组件类
+ */
+
+/* 喜鹊乌冬面 —— 本地 TTF，放 public/fonts */
+@font-face {
+  font-family: '喜鹊乌冬面';
+  src: url('/fonts/XiqueWudongmian.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  min-height: 100%;
+}
+
+/** 预留滚动条槽位，避免内容高度变化时页面左右跳动 */
+html {
+  scrollbar-gutter: stable;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  line-height: 1.55;
+  color: var(--c-ink);
+  background: var(--c-cream);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Element Plus 弹层也跟站内字体 */
+.el-popup-parent--hidden,
+.el-overlay,
+.el-popper {
+  font-family: var(--font-body);
+}
+
+a {
+  color: var(--c-coral);
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* —— 卡片 —— */
+.mia-card {
+  border: var(--stroke);
+  border-radius: var(--r-lg);
+  background: var(--c-cream-2);
+  box-shadow: var(--shadow-sticker);
+  padding: 16px;
+  transition:
+    transform var(--dur) var(--ease-bounce),
+    box-shadow var(--dur) var(--ease-bounce);
+  animation: miaCardIn 0.34s var(--ease-bounce) both;
+}
+
+.mia-card:hover {
+  transform: translate(-2px, -3px);
+  box-shadow: var(--shadow-pop);
+}
+
+@keyframes miaCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* —— 按钮 —— */
+.mia-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 22px;
+  border: var(--stroke);
+  border-radius: var(--r-pill);
+  background: var(--c-cream-2);
+  color: var(--c-ink);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow: var(--shadow-sticker);
+  transition:
+    transform var(--dur) var(--ease-bounce),
+    box-shadow var(--dur) var(--ease-bounce),
+    background var(--dur) var(--ease-soft);
+}
+
+.mia-btn:hover {
+  transform: translate(-1px, -2px);
+  box-shadow: var(--shadow-pop);
+}
+
+.mia-btn:active {
+  transform: scale(0.96);
+}
+
+.mia-btn--primary {
+  background: var(--c-coral);
+  color: #fff;
+}
+
+.mia-btn--honey {
+  background: var(--c-honey);
+  color: var(--c-ink);
+}
+
+.mia-btn--mint {
+  background: var(--c-mint);
+  color: #fff;
+}
+
+/* —— Chips —— */
+.mia-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border: var(--stroke-light);
+  border-radius: var(--r-pill);
+  background: var(--c-cream-2);
+  color: var(--c-ink);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform var(--dur) var(--ease-bounce),
+    box-shadow var(--dur) var(--ease-bounce),
+    background var(--dur) var(--ease-soft);
+}
+
+.mia-chip:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-sticker);
+}
+
+.mia-chip.is-active {
+  background: var(--c-coral-soft);
+  box-shadow: var(--shadow-sticker);
+  font-weight: 600;
+}
+
+/* —— 输入框 —— */
+.mia-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: var(--stroke);
+  border-radius: var(--r-md);
+  background: var(--c-cream-2);
+  color: var(--c-ink);
+  font-size: var(--fs-base);
+  font-family: inherit;
+  outline: none;
+  transition:
+    border-color var(--dur) var(--ease-soft),
+    box-shadow var(--dur) var(--ease-soft),
+    background var(--dur) var(--ease-soft);
+}
+
+.mia-input:focus,
+.mia-input:focus-visible {
+  border-color: var(--c-coral);
+  box-shadow: 0 0 0 3px var(--c-coral-soft);
+}
+
+.mia-input::placeholder {
+  color: var(--c-ink-3);
+}
+
+/* —— 空状态 —— */
+.mia-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 16px;
+  color: var(--c-ink-2);
+  text-align: center;
+}
+
+.mia-empty__emoji {
+  font-size: 48px;
+  line-height: 1;
+}
+
+.mia-empty__text {
+  font-size: var(--fs-base);
+  margin: 0;
+}

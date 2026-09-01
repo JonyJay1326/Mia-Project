@@ -1,0 +1,64 @@
+---
+description: 前后端技术栈铁律 - NestJS+FastifyAdapter、Vue3、SQLite、环境变量
+alwaysApply: true
+---
+
+# 技术栈铁律
+
+## 前端
+
+Vue 3 + TypeScript + Vite + Pinia + **Element Plus**
+
+- Element Plus 按需引入（`unplugin-vue-components` + `unplugin-auto-import`），别全量引
+- 状态用 Pinia（`stores/events.ts`、`stores/quotes.ts`、`stores/draft.ts`）
+- PWA 用 `vite-plugin-pwa`，**但阶段一默认关闭 Service Worker**
+
+## ⚠️ 后端：NestJS + FastifyAdapter（不是裸 Fastify！）
+
+用户选了 NestJS。但服务器只有 3.32GB 内存，**所以必须配 Fastify 适配器**——两者都要：
+
+```typescript
+// server/src/main.ts
+const app = await NestFactory.create<NestFastifyApplication>(
+  AppModule,
+  new FastifyAdapter()          // ⭐ 关键
+)
+app.setGlobalPrefix('api')
+app.enableCors({ origin: true })
+await app.listen(3000, '127.0.0.1')   // ⭐ 不是 0.0.0.0
+```
+
+**千万别写成 `import Fastify from 'fastify'` 的裸 Fastify 路由函数写法。**
+依赖注入、装饰器、模块划分照常用 NestJS 那套，业务代码不受影响。
+
+| 注意点 | 说明 |
+|---|---|
+| 依赖 | `@nestjs/platform-fastify`，**不是** `@nestjs/platform-express` |
+| 上传 | `@fastify/multipart`，**不是** `multer` |
+| 中间件 | Fastify 用 `@fastify/middie`，写法有差异 |
+| 监听 | `127.0.0.1` —— 绑 `0.0.0.0` 会让 3000 端口绕过 Basic Auth 裸奔 |
+| 路由 | 有全局前缀 `api`，controller 写 `@Controller('events')` 而非 `'api/events'` |
+
+## 数据库：SQLite + better-sqlite3
+
+零运维，备份即复制文件。位置 `server/data/mia.db`。
+
+- 建表 SQL 放 `server/src/db/schema.sql`，启动时执行 `CREATE TABLE IF NOT EXISTS`
+- 开 `journal_mode = WAL`，读写并发更稳
+- **时间戳统一用 ISO 字符串**，别用 SQLite 的 DATETIME（时区会坑）
+
+## 环境变量（别硬编码 API 地址）
+
+```bash
+# mia-web/.env.development
+VITE_API_BASE=http://localhost:3000/api
+
+# mia-web/.env.production
+VITE_API_BASE=/api          # 相对路径，由 Nginx 反代
+```
+
+```typescript
+const BASE = import.meta.env.VITE_API_BASE ?? '/api'
+```
+
+> ⚠️ 服务器上已跑着「班主任管理平台」，配反向代理前先 `ss -tlnp | grep 3000` 确认端口没冲突。

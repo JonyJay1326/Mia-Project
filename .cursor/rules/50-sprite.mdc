@@ -1,0 +1,48 @@
+---
+description: 毯子小精灵 - 视频 + Canvas 实时抠像、状态机
+globs: ["**/BlanketSprite/**", "**/SpriteImage.vue", "**/QuoteBubble.vue", "**/useSpriteState.ts", "**/canvasChromaKey.ts", "**/assets/sprite/**"]
+alwaysApply: false
+---
+
+# 毯子小精灵
+
+基于 Mia 的阿贝贝（安抚毯）的互动形象，固定右下角。点击播视频片段切到下一态后弹出语录。
+
+## 形象原则
+
+- ❌ 不加眼睛（毯子已有兔子脸花纹）
+- ❌ 不做「穿毯子的小人」
+- ✅ 生命感来自形态与动作
+
+## 素材：原视频 + Canvas 实时抠像（方案 B）
+
+源视频：`mia-web/src/assets/sprite/blanket_loop_12s_v3.mp4`（约 12s）
+
+```
+隐藏 <video> + 可见 <canvas>
+每帧 drawImage → 边缘 flood-fill 抠浅灰棚拍背景
+白兔花纹不连通边缘，保持不透明
+```
+
+时间轴：`sprite-timeline.json`
+
+| 状态 | 时刻 |
+|---|---|
+| idle | 0s |
+| wave | ~4s |
+| sleep | ~8s |
+| fold | ~11.6s |
+
+展示宽约 **256px**。不再用 80 帧 `blanket-sheet.webp` 做展示。
+
+## 前端行为
+
+```
+默认定格当前关键时刻 + 缓慢微晃
+悬浮：晃动略快略大
+点击：从当前时刻播到下一关键时刻 → 停下 → 弹语录
+顺序：idle → wave → sleep → fold → idle（fold→idle 为 seek(0)+淡入）
+页隐藏：保持当前定格（切态中则直接落到目标态）；回来静默对齐，不闪 idle
+```
+
+抠像工具：`mia-web/src/utils/canvasChromaKey.ts`

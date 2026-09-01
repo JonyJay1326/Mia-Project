@@ -1,0 +1,109 @@
+---
+description: 后端 NestJS 与 SQLite 数据约定 - 幂等、时间戳、月龄、表结构
+globs: ["server/**/*.ts", "server/**/*.sql", "src/api/**/*.ts", "src/types/**/*.ts"]
+alwaysApply: false
+---
+
+# 后端与数据约定
+
+## 两张表（阶段一）
+
+`events`（事件）+ `quotes`（语录），详见规格第 3 节和 4.6.2 节。
+
+**`type` 里没有 `quote`** —— 语录单独建表，别混进 events。
+
+## ⚠️ POST 必须幂等（最容易踩的坑）
+
+离线重放必然重复提交。用客户端生成的 `id`（`crypto.randomUUID()`）做主键：
+
+```sql
+INSERT OR IGNORE INTO events (...) VALUES (...)
+```
+
+不是数据库自增 id —— 离线状态下也要能建记录。
+
+## 时间戳
+
+- **统一 ISO 字符串**（`new Date().toISOString()`）
+- 别用 SQLite 的 DATETIME，时区会坑
+- 别存 Unix 时间戳
+
+## 月龄计算
+
+**按完整月算，不是天数除 30。** Mia 出生日期 `2024-05-17`。
+
+```typescript
+function monthAge(birthDate: string, at: string): number {
+  const b = new Date(birthDate), a = new Date(at)
+  let m = (a.getFullYear() - b.getFullYear()) * 12 + (a.getMonth() - b.getMonth())
+  if (a.getDate() < b.getDate()) m--      // 没到当月生日那天就不算满月
+  return m
+}
+```
+
+`month_age` 在 events 和 quotes 里都是**冗余字段**（写入时算好，查询时省事），
+`quotes` 里是分组展示的核心，不能为空。
+
+## 可空字段设计
+
+崩溃详情（`intensity` / `duration_min` / `coping` / `outcome`）**全部可空**，
+支持「先提交，后补详情」——录入时崩着呢，没空填这么多。
+
+`napped`（当日是否午睡）是 Mia 专用字段，用来验证「睡了 vs 没睡」的情绪差异。
+
+## 语录（渺言妙语）特殊约定
+
+- `content` 是**原话逐字记录，不加工** —— 写「她对声音好奇」就毁了，要写她原话
+- `note` 是我的解读，跟 `content` 分开存，展示时视觉区分
+- **宁可多记不筛选**，录入成本要低到不需要犹豫
+- 展示**按月龄分组，不按日期** —— 按日期是流水账，按月龄是一部认知发展史
+
+## API 约定
+
+统一响应格式 `{ ok: boolean, data?: T, error?: string }`。
+
+路由（有全局前缀 `api`）：
+
+```
+POST   /events              幂等创建
+GET    /events?limit=50&before=<iso>
+GET    /events/:id
+PATCH  /events/:id          补充详情
+DELETE /events/:id
+
+POST   /quotes
+GET    /quotes              按月龄分组返回
+GET    /quotes?random=1     随机一条（毯子精灵气泡用）
+GET    /quotes/:id
+PATCH  /quotes/:id
+DELETE /quotes/:id
+
+GET    /health
+GET    /analytics/meltdown?days=60   崩溃统计（阶段二）
+
+POST   /photos              multipart 上传（字段 file）
+GET    /photos?limit=&before=
+GET    /photos/:id
+GET    /photos/:id/file?v=thumb|original
+DELETE /photos/:id
+
+GET    /skills
+PUT    /skills/:id/mark
+
+GET    /ai/status
+POST   /ai/chat
+POST   /ai/insight
+```
+
+阶段一**不做应用内鉴权**，用 Nginx Basic Auth 挡（规格 8.2）。
+照片落盘在 `server/data/photos/`，**务必走 Nginx Basic Auth**，别把 3000 端口裸露公网。
+技能目录在 `server/src/skills/skill-catalog.ts`，启动时 upsert；档案已知项会幂等标为 done。
+
+AI 默认 DeepSeek（`server/.env`）：
+
+```
+MIA_AI_API_KEY=sk-...
+MIA_AI_BASE_URL=https://api.deepseek.com/v1
+MIA_AI_MODEL=deepseek-chat
+# MIA_ARCHIVE_PATH=指向 Mia档案.md（可选，默认自动找）
+```

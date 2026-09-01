@@ -1,0 +1,12 @@
+{
+  "displayWidth": 320,
+  "durationSec": 12.04,
+  "playbackRate": 2,
+  "keys": {
+    "idle": 0,
+    "wave": 4,
+    "sleep": 8,
+    "fold": 11.6
+  },
+  "note": "显示宽 320；内部 2×dpr 采样抠像后再裁切放大毯子；playbackRate 切态倍速"
+}
