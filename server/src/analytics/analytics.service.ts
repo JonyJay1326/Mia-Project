@@ -25,14 +25,10 @@ const LOCATION_LABELS: Record<string, string> = {
   outdoor: '户外',
   mall: '商场',
   grandparents: '爷奶家',
+  taoshudi: '桃树地',
+  tongtong: '彤彤姐家',
+  school: '学校',
   other: '其他',
-}
-
-const CAREGIVER_LABELS: Record<string, string> = {
-  mom: '妈妈',
-  dad: '爸爸',
-  grandma: '奶奶',
-  grandpa: '爷爷',
 }
 
 /** 崩溃分析聚合服务 */
@@ -69,20 +65,10 @@ export class AnalyticsService {
     const chipMap = new Map<string, number>()
     const triggerMap = new Map<string, number>()
     const locationMap = new Map<string, number>()
-    const caregiverMap = new Map<string, number>()
     const copingMap = new Map<string, number>()
     const napped = { nappedYes: 0, nappedNo: 0, nappedUnknown: 0 }
     const weekMap = new Map<string, number>()
     const hourSlotMap = new Map<string, number>()
-    const weekdayMap = new Map<string, number>([
-      ['1', 0],
-      ['2', 0],
-      ['3', 0],
-      ['4', 0],
-      ['5', 0],
-      ['6', 0],
-      ['0', 0],
-    ])
 
     for (const ev of events) {
       if (typeof ev.intensity === 'number') {
@@ -106,9 +92,6 @@ export class AnalyticsService {
       const locationKey = ev.location ?? 'other'
       locationMap.set(locationKey, (locationMap.get(locationKey) ?? 0) + 1)
 
-      const caregiverKey = ev.caregiver || 'mom'
-      caregiverMap.set(caregiverKey, (caregiverMap.get(caregiverKey) ?? 0) + 1)
-
       for (const coping of ev.coping ?? []) {
         const key = coping.trim()
         if (!key) continue
@@ -125,9 +108,6 @@ export class AnalyticsService {
       const when = new Date(ev.happenedAt)
       const slot = hourSlotOf(when.getHours())
       hourSlotMap.set(slot.key, (hourSlotMap.get(slot.key) ?? 0) + 1)
-
-      const wd = String(when.getDay())
-      weekdayMap.set(wd, (weekdayMap.get(wd) ?? 0) + 1)
     }
 
     return {
@@ -148,7 +128,6 @@ export class AnalyticsService {
       byChip: toRanked(chipMap),
       byTrigger: toRanked(triggerMap, TRIGGER_LABELS),
       byLocation: toRanked(locationMap, LOCATION_LABELS),
-      byCaregiver: toRanked(caregiverMap, CAREGIVER_LABELS),
       byCoping: toCopingRanked(copingMap),
       byNapped: napped,
       byHour: HOUR_SLOTS.map((slot) => ({
@@ -156,11 +135,6 @@ export class AnalyticsService {
         label: slot.label,
         count: hourSlotMap.get(slot.key) ?? 0,
       })).filter((item) => item.count > 0),
-      byWeekday: WEEKDAY_ORDER.map((key) => ({
-        key,
-        label: WEEKDAY_LABELS[key],
-        count: weekdayMap.get(key) ?? 0,
-      })),
     }
   }
 }
@@ -174,18 +148,6 @@ const HOUR_SLOTS = [
   { key: 'evening', label: '傍晚 17–20', from: 17, to: 20 },
   { key: 'night', label: '晚上 20–24', from: 20, to: 24 },
 ] as const
-
-const WEEKDAY_ORDER = ['1', '2', '3', '4', '5', '6', '0'] as const
-
-const WEEKDAY_LABELS: Record<string, string> = {
-  '1': '周一',
-  '2': '周二',
-  '3': '周三',
-  '4': '周四',
-  '5': '周五',
-  '6': '周六',
-  '0': '周日',
-}
 
 /**
  * 将小时映射到时段

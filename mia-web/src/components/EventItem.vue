@@ -2,15 +2,21 @@
 import TypeChip from '@/components/TypeChip.vue'
 import type { TimelineItem } from '@/utils/timeline'
 import { formatTime, intensityDots } from '@/utils/timeline'
-import { CAREGIVER_CHIPS, LOCATION_CHIPS, TRIGGER_CHIPS } from '@/config/chips'
+import {
+  caregiverLabel,
+  locationLabel,
+  TRIGGER_CHIPS,
+} from '@/config/chips'
 
 defineProps<{
   item: TimelineItem
   active?: boolean
+  removing?: boolean
 }>()
 
 const emit = defineEmits<{
   select: []
+  remove: []
 }>()
 
 /** 枚举值转中文标签 */
@@ -23,11 +29,14 @@ function labelOf(
 </script>
 
 <template>
-  <button
-    type="button"
+  <article
     class="mia-card event-item"
     :class="{ 'is-active': active }"
+    role="button"
+    tabindex="0"
     @click="emit('select')"
+    @keydown.enter.prevent="emit('select')"
+    @keydown.space.prevent="emit('select')"
   >
     <div class="event-item__head">
       <TypeChip :type="item.type" />
@@ -42,6 +51,15 @@ function labelOf(
       <span v-if="item.event?.durationMin" class="event-item__meta">
         {{ item.event.durationMin }}min
       </span>
+      <button
+        type="button"
+        class="event-item__delete"
+        :disabled="removing"
+        :aria-label="`删除：${item.title}`"
+        @click.stop="emit('remove')"
+      >
+        删除
+      </button>
     </div>
 
     <p class="event-item__title">
@@ -50,8 +68,8 @@ function labelOf(
     </p>
 
     <p v-if="item.event" class="event-item__sub desktop-only">
-      照护：{{ labelOf(CAREGIVER_CHIPS, item.event.caregiver) }}
-      · 地点：{{ labelOf(LOCATION_CHIPS, item.event.location) }}
+      照护：{{ caregiverLabel(item.event.caregiver) }}
+      · 地点：{{ locationLabel(item.event.location) }}
       <template v-if="item.event.trigger">
         · 触发：{{ labelOf(TRIGGER_CHIPS, item.event.trigger) }}
       </template>
@@ -59,7 +77,7 @@ function labelOf(
         item.event.napped === 1 ? '是' : item.event.napped === 0 ? '否' : '—'
       }}
     </p>
-  </button>
+  </article>
 </template>
 
 <style scoped>
@@ -102,6 +120,29 @@ function labelOf(
 .event-item__meta {
   font-size: var(--fs-xs);
   color: var(--c-ink-2);
+}
+
+.event-item__delete {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border: var(--stroke-light);
+  border-radius: var(--r-pill);
+  background: var(--c-cream-2);
+  color: var(--c-ink-2);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.event-item__delete:hover:not(:disabled) {
+  color: var(--c-coral);
+  border-color: var(--c-coral);
+}
+
+.event-item__delete:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .event-item__title {

@@ -14,7 +14,7 @@ import {
   monthKey,
   type TimelineItem,
 } from '@/utils/timeline'
-import { CAREGIVER_CHIPS, LOCATION_CHIPS, TRIGGER_CHIPS } from '@/config/chips'
+import { TRIGGER_CHIPS, caregiverLabel, locationLabel } from '@/config/chips'
 import { useEventsStore } from '@/stores/events'
 import { useMiaConfirm } from '@/composables/useMiaConfirm'
 
@@ -25,8 +25,12 @@ const FILTERS: { value: FilterType; label: string }[] = [
   { value: 'meltdown', label: '崩溃' },
   { value: 'quote', label: '语录' },
   { value: 'skill', label: '技能' },
-  { value: 'health', label: '健康' },
-  { value: 'question', label: '疑问' },
+  { value: 'daily', label: '日常' },
+  { value: 'emotion', label: '情绪' },
+  { value: 'sleep', label: '睡眠' },
+  { value: 'diet', label: '饮食' },
+  { value: 'social', label: '社交' },
+  { value: 'medical', label: '医疗' },
 ]
 
 const router = useRouter()
@@ -43,6 +47,7 @@ const activeMonth = ref<string | null>(null)
 const drawerOpen = ref(false)
 const editing = ref(false)
 const saving = ref(false)
+const removingId = ref<string | null>(null)
 
 /** 按筛选过滤后的列表 */
 const filtered = computed(() => {
@@ -208,15 +213,14 @@ async function saveEdit() {
   }
 }
 
-/** 删除当前事件或语录 */
-async function removeSelected() {
-  if (!selected.value) {
-    return
-  }
-  const kindLabel = selected.value.kind === 'quote' ? '语录' : '记录'
+/** 删除指定时间线条目（二次确认） */
+async function removeItem(item: TimelineItem) {
+  const kindLabel = item.kind === 'quote' ? '语录' : '记录'
+  const preview =
+    item.title.length > 24 ? `${item.title.slice(0, 24)}…` : item.title
   const ok = await confirm({
     title: `删除这条${kindLabel}？`,
-    message: '删除后不可恢复。',
+    message: `删除后不可恢复。\n\n「${preview}」`,
     confirmText: '删除',
     cancelText: '再想想',
     danger: true,
@@ -224,13 +228,30 @@ async function removeSelected() {
   if (!ok) {
     return
   }
-  if (selected.value.kind === 'event') {
-    await deleteEvent(selected.value.id)
-  } else {
-    await deleteQuote(selected.value.id)
+  removingId.value = item.id
+  try {
+    if (item.kind === 'event') {
+      await deleteEvent(item.id)
+    } else {
+      await deleteQuote(item.id)
+    }
+    if (eventsStore.selectedId === item.id) {
+      closeDrawer()
+    }
+    await load()
+  } catch (err) {
+    console.error(err)
+  } finally {
+    removingId.value = null
   }
-  closeDrawer()
-  await load()
+}
+
+/** 删除当前抽屉中选中的事件或语录 */
+async function removeSelected() {
+  if (!selected.value) {
+    return
+  }
+  await removeItem(selected.value)
 }
 
 /** Esc 关闭抽屉 */
@@ -332,7 +353,9 @@ onUnmounted(() => {
                 :key="item.id"
                 :item="item"
                 :active="eventsStore.selectedId === item.id"
+                :removing="removingId === item.id"
                 @select="openItem(item)"
+                @remove="removeItem(item)"
               />
             </div>
           </div>
@@ -389,8 +412,8 @@ onUnmounted(() => {
               · {{ formatMonthAge(selected.event.monthAge) }}
             </p>
             <ul class="drawer__facts">
-              <li>照护：{{ labelOf(CAREGIVER_CHIPS, selected.event.caregiver) }}</li>
-              <li>地点：{{ labelOf(LOCATION_CHIPS, selected.event.location) }}</li>
+              <li>照护：{{ caregiverLabel(selected.event.caregiver) }}</li>
+              <li>地点：{{ locationLabel(selected.event.location) }}</li>
               <li v-if="selected.event.trigger">
                 触发：{{ labelOf(TRIGGER_CHIPS, selected.event.trigger) }}
               </li>

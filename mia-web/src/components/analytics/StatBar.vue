@@ -25,7 +25,7 @@ const widthPct = computed(() => {
 </script>
 
 <template>
-  <div class="stat-bar" :title="`${label} · ${value}`">
+  <div class="stat-bar">
     <div class="stat-bar__label">{{ label }}</div>
     <div class="stat-bar__track">
       <div

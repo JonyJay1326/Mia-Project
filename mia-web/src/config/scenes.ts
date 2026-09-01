@@ -23,46 +23,14 @@ export interface Scene {
   custom?: boolean
 }
 
-/** 默认 8 张场景（基于 Mia 档案高发场景） */
+/** 默认场景：崩溃一张总卡 + 各类型入口（细节靠 chips） */
 export const DEFAULT_SCENES: Scene[] = [
   {
-    id: 'mall-want',
-    label: '商场要买',
-    icon: '🛒',
-    preset: { type: 'meltdown', location: 'mall', trigger: 'refused' },
+    id: 'meltdown',
+    label: '崩溃',
+    icon: '🍭',
+    preset: { type: 'meltdown' },
     order: 1,
-    count: 0,
-  },
-  {
-    id: 'no-gohome',
-    label: '不想回家',
-    icon: '🚶',
-    preset: { type: 'meltdown', location: 'outdoor', trigger: 'interrupted' },
-    order: 2,
-    count: 0,
-  },
-  {
-    id: 'order-broken',
-    label: '顺序被打乱',
-    icon: '🔀',
-    preset: { type: 'meltdown', trigger: 'order' },
-    order: 3,
-    count: 0,
-  },
-  {
-    id: 'dress-food',
-    label: '吃饭穿衣',
-    icon: '🍚',
-    preset: { type: 'meltdown', trigger: 'dressed' },
-    order: 4,
-    count: 0,
-  },
-  {
-    id: 'sleep-fight',
-    label: '睡前闹',
-    icon: '🌙',
-    preset: { type: 'meltdown', location: 'home', trigger: 'bedtime' },
-    order: 5,
     count: 0,
   },
   {
@@ -70,28 +38,61 @@ export const DEFAULT_SCENES: Scene[] = [
     label: '新技能',
     icon: '🌱',
     preset: { type: 'skill' },
+    order: 2,
+    count: 0,
+  },
+  {
+    id: 'daily',
+    label: '日常点滴',
+    icon: '📒',
+    preset: { type: 'daily' },
+    order: 3,
+    count: 0,
+  },
+  {
+    id: 'emotion',
+    label: '情绪观察',
+    icon: '🫧',
+    preset: { type: 'emotion' },
+    order: 4,
+    count: 0,
+  },
+  {
+    id: 'sleep',
+    label: '睡眠',
+    icon: '😴',
+    preset: { type: 'sleep' },
+    order: 5,
+    count: 0,
+  },
+  {
+    id: 'diet',
+    label: '饮食',
+    icon: '🥣',
+    preset: { type: 'diet' },
     order: 6,
     count: 0,
   },
   {
-    id: 'health',
-    label: '身体',
-    icon: '💊',
-    preset: { type: 'health' },
+    id: 'social',
+    label: '社交分离',
+    icon: '👋',
+    preset: { type: 'social' },
     order: 7,
     count: 0,
   },
   {
-    id: 'question',
-    label: '想问',
-    icon: '❓',
-    preset: { type: 'question' },
+    id: 'medical',
+    label: '医疗',
+    icon: '💊',
+    preset: { type: 'medical' },
     order: 8,
     count: 0,
   },
 ]
 
-const STORAGE_KEY = 'mia-scenes-v1'
+/** v3：崩溃收成单卡 */
+const STORAGE_KEY = 'mia-scenes-v3'
 
 /** 场景本地持久化结构 */
 interface ScenesStorage {
@@ -100,7 +101,7 @@ interface ScenesStorage {
   orderIds?: string[]
 }
 
-/** 从 localStorage 读取场景配置，无则返回默认 8 张 */
+/** 从 localStorage 读取场景配置，无则返回默认场景 */
 export function loadScenes(): Scene[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -154,7 +155,6 @@ export function sortScenesForDisplay(
         map.delete(id)
       }
     }
-    // 新增但未进 orderIds 的，追加到末尾
     for (const rest of map.values()) {
       ordered.push(rest)
     }

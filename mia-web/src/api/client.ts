@@ -71,13 +71,22 @@ function extractErrorMessage(json: unknown): string | undefined {
  * 统一请求封装：拼接 API 基址并校验 { ok, data, error } 响应
  */
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? 'GET').toUpperCase()
+  const hasBody = init?.body != null && init.body !== ''
+  // DELETE/GET 不要带 application/json，否则 Fastify 解析空 body 会 400
+  const headers: Record<string, string> = {
+    ...getAuthHeaders(),
+    ...(init?.headers as Record<string, string> | undefined),
+  }
+  if (hasBody || method === 'POST' || method === 'PUT' || method === 'PATCH') {
+    if (!headers['Content-Type'] && !headers['content-type']) {
+      headers['Content-Type'] = 'application/json'
+    }
+  }
+
   const res = await fetch(`${BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-      ...(init?.headers ?? {}),
-    },
     ...init,
+    headers,
   })
 
   const json = (await res.json().catch(() => null)) as

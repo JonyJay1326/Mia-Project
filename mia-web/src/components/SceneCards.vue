@@ -173,7 +173,7 @@ async function addScene() {
       id,
       label,
       icon,
-      preset: { type: 'question' },
+      preset: { type: 'daily' },
       order: scenes.value.length + 1,
       count: 0,
       custom: true,

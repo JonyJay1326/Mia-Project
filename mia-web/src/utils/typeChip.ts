@@ -22,17 +22,41 @@ export const TYPE_CHIP_MAP: Record<TimelineItemType, TypeChipStyle> = {
     color: '#7fc8a9',
     bg: '#d6efe3',
   },
-  health: {
-    label: '健康',
+  daily: {
+    label: '日常',
+    icon: '📒',
+    color: '#c4a574',
+    bg: '#f3eadc',
+  },
+  emotion: {
+    label: '情绪',
+    icon: '🫧',
+    color: '#e8a87c',
+    bg: '#f8e6d8',
+  },
+  sleep: {
+    label: '睡眠',
     icon: '🌙',
     color: '#6ba3d6',
     bg: '#dceaf5',
   },
-  question: {
-    label: '疑问',
-    icon: '❓',
-    color: '#f5c45e',
-    bg: '#fbf0d6',
+  diet: {
+    label: '饮食',
+    icon: '🥣',
+    color: '#d4896a',
+    bg: '#f5e0d6',
+  },
+  social: {
+    label: '社交',
+    icon: '👋',
+    color: '#7eb8b2',
+    bg: '#dceeed',
+  },
+  medical: {
+    label: '医疗',
+    icon: '💊',
+    color: '#6b8fd6',
+    bg: '#dde6f5',
   },
   quote: {
     label: '语录',
@@ -40,11 +64,24 @@ export const TYPE_CHIP_MAP: Record<TimelineItemType, TypeChipStyle> = {
     color: '#a98bc4',
     bg: '#ede5f3',
   },
+  // 历史数据兼容
+  health: {
+    label: '健康',
+    icon: '🌙',
+    color: '#6ba3d6',
+    bg: '#dceaf5',
+  },
+  question: {
+    label: '想问',
+    icon: '❓',
+    color: '#f5c45e',
+    bg: '#fbf0d6',
+  },
 }
 
 /**
- * 按事件类型取胶囊样式，未知类型回退为疑问样式
+ * 按事件类型取胶囊样式，未知类型回退为日常
  */
 export function getTypeChipStyle(type: TimelineItemType): TypeChipStyle {
-  return TYPE_CHIP_MAP[type] ?? TYPE_CHIP_MAP.question
+  return TYPE_CHIP_MAP[type] ?? TYPE_CHIP_MAP.daily
 }

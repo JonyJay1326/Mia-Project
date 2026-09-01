@@ -30,9 +30,9 @@ export class SeedService implements OnModuleInit {
     const created = this.insertEventIfAbsent({
       id: 'seed-2026-08-31-early-wake',
       happenedAt,
-      type: 'health',
+      type: 'sleep',
       summary: '早醒要喝奶，说肚子不舒服，放屁后缓解但不再睡',
-      chips: ['睡不好/早醒', '肚子不舒服'],
+      chips: ['早醒', '肚子不舒服'],
       location: 'home',
       caregiver: 'dad',
       napped: null,
@@ -122,7 +122,7 @@ export class SeedService implements OnModuleInit {
         durationMin: 5,
         coping: ['给两个选项', '讲道理'],
         outcome: '换小份后吃了几口',
-        caregiver: 'grandma',
+        caregiver: 'mom',
         napped: 1,
       },
     ]

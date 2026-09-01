@@ -49,14 +49,10 @@ export interface MeltdownAnalytics {
   byTrigger: CountItem[]
   /** 地点排行 */
   byLocation: CountItem[]
-  /** 照护人排行 */
-  byCaregiver: CountItem[]
   /** 应对方式排行 */
   byCoping: CopingItem[]
   /** 午睡对照 */
   byNapped: NappedCompare
-  /** 按时段（本地小时 0–23，仅非 0 或全部 24 槽） */
+  /** 按时段（本地小时） */
   byHour: CountItem[]
-  /** 按星期（周一→周日） */
-  byWeekday: CountItem[]
 }

@@ -105,6 +105,7 @@ export class SkillsService implements OnModuleInit {
         typicalFrom: row.typical_from,
         typicalTo: row.typical_to,
         sortOrder: row.sort_order,
+        isCustom: Boolean(row.is_custom),
         status,
         markedAt,
         note: mark?.note ?? null,
@@ -150,8 +151,13 @@ export class SkillsService implements OnModuleInit {
         .prepare('DELETE FROM skill_marks WHERE skill_id = ?')
         .run(skillId)
     } else {
-      const markedAt = input.markedAt || new Date().toISOString()
+      const existing = this.dbService.db
+        .prepare('SELECT * FROM skill_marks WHERE skill_id = ?')
+        .get(skillId) as MarkRow | undefined
+      const markedAt = input.markedAt || existing?.marked_at || new Date().toISOString()
       const now = new Date().toISOString()
+      const note =
+        input.note !== undefined ? input.note : (existing?.note ?? null)
       this.dbService.db
         .prepare(
           `INSERT INTO skill_marks (skill_id, status, marked_at, note, updated_at)
@@ -166,11 +172,75 @@ export class SkillsService implements OnModuleInit {
           skill_id: skillId,
           status: input.status,
           marked_at: markedAt,
-          note: input.note ?? null,
+          note,
           updated_at: now,
         })
     }
 
+    return this.requireItem(skillId)
+  }
+
+  /**
+   * 更新备注（无标记时默认记为刚出现）
+   */
+  updateNote(skillId: string, note: string | null): SkillItem {
+    const skill = this.dbService.db
+      .prepare('SELECT * FROM skills WHERE id = ?')
+      .get(skillId) as SkillRow | undefined
+    if (!skill) {
+      throw new NotFoundException('技能不存在')
+    }
+
+    const existing = this.dbService.db
+      .prepare('SELECT * FROM skill_marks WHERE skill_id = ?')
+      .get(skillId) as MarkRow | undefined
+    const now = new Date().toISOString()
+    const status = (existing?.status as SkillStatus | undefined) ?? 'emerging'
+    const markedAt = existing?.marked_at ?? now
+    const trimmed = note?.trim() ? note.trim().slice(0, 200) : null
+
+    this.dbService.db
+      .prepare(
+        `INSERT INTO skill_marks (skill_id, status, marked_at, note, updated_at)
+         VALUES (@skill_id, @status, @marked_at, @note, @updated_at)
+         ON CONFLICT(skill_id) DO UPDATE SET
+           note = excluded.note,
+           updated_at = excluded.updated_at`,
+      )
+      .run({
+        skill_id: skillId,
+        status,
+        marked_at: markedAt,
+        note: trimmed,
+        updated_at: now,
+      })
+
+    return this.requireItem(skillId)
+  }
+
+  /**
+   * 删除自定义技能（目录项不可删）
+   */
+  removeCustom(skillId: string): { id: string } {
+    const skill = this.dbService.db
+      .prepare('SELECT * FROM skills WHERE id = ?')
+      .get(skillId) as SkillRow | undefined
+    if (!skill) {
+      throw new NotFoundException('技能不存在')
+    }
+    if (!skill.is_custom) {
+      throw new BadRequestException('目录技能不能删除，可改为「未观察」')
+    }
+
+    this.dbService.db
+      .prepare('DELETE FROM skill_marks WHERE skill_id = ?')
+      .run(skillId)
+    this.dbService.db.prepare('DELETE FROM skills WHERE id = ?').run(skillId)
+    return { id: skillId }
+  }
+
+  /** 从分组列表中取单条技能 */
+  private requireItem(skillId: string): SkillItem {
     const groups = this.listGrouped()
     for (const g of groups) {
       const hit = g.items.find((i) => i.id === skillId)
@@ -230,14 +300,7 @@ export class SkillsService implements OnModuleInit {
       )
       .run(id, status, markedAt, input.note ?? null, now)
 
-    const groups = this.listGrouped()
-    for (const g of groups) {
-      const hit = g.items.find((i) => i.id === id)
-      if (hit) {
-        return hit
-      }
-    }
-    throw new NotFoundException('创建失败')
+    return this.requireItem(id)
   }
 
   /** 某领域下一个排序号 */

@@ -1,11 +1,30 @@
 /** 事件类型（语录单独建表，不在此枚举） */
-export type EventType = 'meltdown' | 'skill' | 'health' | 'question'
+export type EventType =
+  | 'meltdown'
+  | 'skill'
+  | 'daily'
+  | 'emotion'
+  | 'sleep'
+  | 'diet'
+  | 'social'
+  | 'medical'
 
-/** 时间线展示用类型（含语录） */
-export type TimelineItemType = EventType | 'quote'
+/** 历史类型（仅兼容已有数据展示，不可新建） */
+export type LegacyEventType = 'health' | 'question'
+
+/** 时间线展示用类型（含语录与历史类型） */
+export type TimelineItemType = EventType | LegacyEventType | 'quote'
 
 /** 地点 */
-export type LocationType = 'home' | 'outdoor' | 'mall' | 'grandparents' | 'other'
+export type LocationType =
+  | 'home'
+  | 'outdoor'
+  | 'mall'
+  | 'grandparents'
+  | 'taoshudi'
+  | 'tongtong'
+  | 'school'
+  | 'other'
 
 /** 触发原因 */
 export type TriggerType =
@@ -18,14 +37,14 @@ export type TriggerType =
   | 'bedtime'
   | 'unknown'
 
-/** 照护人 */
+/** 照护人（录入仅用爸妈；爷奶仅兼容旧数据） */
 export type CaregiverType = 'mom' | 'dad' | 'grandma' | 'grandpa'
 
 /** 事件草稿 / 实体 */
 export interface EventRecord {
   id: string
   happenedAt: string
-  type: EventType
+  type: EventType | LegacyEventType
   summary: string
   chips?: string[]
   location?: LocationType | null
