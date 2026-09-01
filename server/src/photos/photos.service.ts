@@ -3,10 +3,10 @@ import {
   Injectable,
   NotFoundException,
   OnModuleInit,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import { createReadStream, existsSync, unlinkSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import sharp from 'sharp'
 import exifr from 'exifr'
 import { DbService } from '../db/db.service'
 import { BIRTH_DATE, monthAge } from '../utils/date'
@@ -18,6 +18,17 @@ import {
   originalPath,
   thumbPath,
 } from './photo-paths'
+
+/** 延迟加载 sharp，避免原生模块缺失时拖垮整个 API 进程 */
+async function loadSharp() {
+  try {
+    const mod = await import('sharp')
+    return mod.default
+  } catch {
+    throw new ServiceUnavailableException(
+      '图片处理模块 sharp 未正确安装，请在服务器执行: npm install --os=linux --cpu=x64 sharp',
+    )
+  }
 
 /** 列表查询参数 */
 interface ListParams {
@@ -71,6 +82,7 @@ export class PhotosService implements OnModuleInit {
     const now = new Date().toISOString()
 
     const takenAt = await readTakenAt(file.buffer, now)
+    const sharp = await loadSharp()
     const image = sharp(file.buffer, { failOn: 'none' })
     const meta = await image.metadata()
     const width = meta.width ?? null

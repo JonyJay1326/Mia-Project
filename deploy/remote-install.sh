@@ -53,22 +53,23 @@ if [[ -f "$STAGING/Mia档案.md" ]]; then
   cp "$STAGING/Mia档案.md" "$DEPLOY_PATH/"
 fi
 
-echo "==> 安装生产依赖（native 模块在服务器编译）"
-cd "$DEPLOY_PATH/server"
-# 含 optional，确保 sharp / better-sqlite3 平台二进制完整
-npm ci --omit=dev --include=optional
-# 若 sharp 仍缺 linux 二进制，强制按当前平台重装
-npm install --omit=dev --os=linux --cpu=x64 sharp better-sqlite3
-
-# 加载 nvm，避免 PM2 落到系统旧 Node
+echo "==> 安装生产依赖（native 模块须与运行 Node 一致）"
+# 先加载 nvm，再 npm（避免用系统旧 Node 装出不兼容的 sharp）
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   # shellcheck disable=SC1090
   . "$NVM_DIR/nvm.sh"
 fi
+echo "    node: $(command -v node) ($(node -v 2>/dev/null || echo unknown))"
+
+cd "$DEPLOY_PATH/server"
+rm -rf node_modules/sharp node_modules/@img
+npm ci --omit=dev --include=optional
+npm rebuild sharp better-sqlite3
+# 仍失败时按当前平台强制重装
+npm install --omit=dev --os=linux --cpu=x64 sharp@^0.35.4
 
 echo "==> 重启 API (PM2)"
-echo "    node: $(command -v node) ($(node -v 2>/dev/null || echo unknown))"
 if pm2 describe mia-api >/dev/null 2>&1; then
   pm2 delete mia-api || true
 fi
