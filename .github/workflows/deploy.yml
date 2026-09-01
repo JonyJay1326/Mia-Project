@@ -61,13 +61,9 @@ jobs:
             WEB_ROOT="${{ secrets.WEB_ROOT || '/opt/1panel/www/sites/mia-web/index' }}"
             REMOTE_TAR="/tmp/mia-release.tar.gz"
             test -f "$REMOTE_TAR"
-            mkdir -p "$DEPLOY_PATH/deploy"
-            if [[ -f "$DEPLOY_PATH/deploy/remote-install.sh" ]]; then
-              DEPLOY_PATH="$DEPLOY_PATH" WEB_ROOT="$WEB_ROOT" bash "$DEPLOY_PATH/deploy/remote-install.sh" "$REMOTE_TAR"
-            else
-              staging=$(mktemp -d)
-              tar -xzf "$REMOTE_TAR" -C "$staging"
-              DEPLOY_PATH="$DEPLOY_PATH" WEB_ROOT="$WEB_ROOT" bash "$staging/deploy/remote-install.sh" "$REMOTE_TAR"
-              rm -rf "$staging"
-            fi
+            # 始终用发布包内脚本，避免服务器上旧版 remote-install.sh 踩坑
+            staging=$(mktemp -d)
+            tar -xzf "$REMOTE_TAR" -C "$staging"
+            DEPLOY_PATH="$DEPLOY_PATH" WEB_ROOT="$WEB_ROOT" bash "$staging/deploy/remote-install.sh" "$REMOTE_TAR"
+            rm -rf "$staging"
             rm -f "$REMOTE_TAR"

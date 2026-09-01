@@ -46,6 +46,8 @@ rsync -a --delete "$STAGING/server/dist/" "$DEPLOY_PATH/server/dist/"
 cp "$STAGING/server/package.json" "$STAGING/server/package-lock.json" "$DEPLOY_PATH/server/"
 cp "$STAGING/deploy/ecosystem.config.cjs" "$STAGING/deploy/remote-install.sh" "$DEPLOY_PATH/deploy/"
 chmod +x "$DEPLOY_PATH/deploy/remote-install.sh"
+# 去掉可能从 Windows 带入的 CRLF
+sed -i 's/\r$//' "$DEPLOY_PATH/deploy/remote-install.sh" || true
 
 if [[ -f "$STAGING/Mia档案.md" ]]; then
   cp "$STAGING/Mia档案.md" "$DEPLOY_PATH/"
@@ -55,12 +57,19 @@ echo "==> 安装生产依赖（native 模块在服务器编译）"
 cd "$DEPLOY_PATH/server"
 npm ci --omit=dev
 
-echo "==> 重启 API (PM2)"
-if pm2 describe mia-api >/dev/null 2>&1; then
-  pm2 reload "$DEPLOY_PATH/deploy/ecosystem.config.cjs" --update-env
-else
-  pm2 start "$DEPLOY_PATH/deploy/ecosystem.config.cjs"
+# 加载 nvm，避免 PM2 落到系统旧 Node
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+  # shellcheck disable=SC1090
+  . "$NVM_DIR/nvm.sh"
 fi
+
+echo "==> 重启 API (PM2)"
+echo "    node: $(command -v node) ($(node -v 2>/dev/null || echo unknown))"
+if pm2 describe mia-api >/dev/null 2>&1; then
+  pm2 delete mia-api || true
+fi
+pm2 start "$DEPLOY_PATH/deploy/ecosystem.config.cjs"
 pm2 save
 
 echo "==> 安装完成"

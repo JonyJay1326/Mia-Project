@@ -198,14 +198,11 @@ DEPLOY_PATH='__DEPLOY_PATH__'
 WEB_ROOT='__WEB_ROOT__'
 REMOTE_TAR='__REMOTE_TAR__'
 mkdir -p "$DEPLOY_PATH/deploy"
-if [[ -f "$DEPLOY_PATH/deploy/remote-install.sh" ]]; then
-  DEPLOY_PATH="$DEPLOY_PATH" WEB_ROOT="$WEB_ROOT" bash "$DEPLOY_PATH/deploy/remote-install.sh" "$REMOTE_TAR"
-else
-  staging=$(mktemp -d)
-  tar -xzf "$REMOTE_TAR" -C "$staging"
-  DEPLOY_PATH="$DEPLOY_PATH" WEB_ROOT="$WEB_ROOT" bash "$staging/deploy/remote-install.sh" "$REMOTE_TAR"
-  rm -rf "$staging"
-fi
+# 始终用发布包内脚本，避免服务器旧版踩坑
+staging=$(mktemp -d)
+tar -xzf "$REMOTE_TAR" -C "$staging"
+DEPLOY_PATH="$DEPLOY_PATH" WEB_ROOT="$WEB_ROOT" bash "$staging/deploy/remote-install.sh" "$REMOTE_TAR"
+rm -rf "$staging"
 rm -f "$REMOTE_TAR"
 '@
 $remoteScript = $remoteScript.Replace('__DEPLOY_PATH__', $DeployPath).Replace('__WEB_ROOT__', $WebRoot).Replace('__REMOTE_TAR__', $remoteTar)

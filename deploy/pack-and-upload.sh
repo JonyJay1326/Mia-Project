@@ -41,14 +41,11 @@ echo "==> 远程安装"
 ssh "${sshArgs[@]}" "$sshTarget" "DEPLOY_PATH='$deployPath' WEB_ROOT='$webRoot' bash -s" <<EOF
 set -euo pipefail
 mkdir -p '$deployPath/deploy'
-if [[ -f '$deployPath/deploy/remote-install.sh' ]]; then
-  DEPLOY_PATH='$deployPath' WEB_ROOT='$webRoot' bash '$deployPath/deploy/remote-install.sh' '$remoteTar'
-else
-  staging=\$(mktemp -d)
-  tar -xzf '$remoteTar' -C "\$staging"
-  DEPLOY_PATH='$deployPath' WEB_ROOT='$webRoot' bash "\$staging/deploy/remote-install.sh" '$remoteTar'
-  rm -rf "\$staging"
-fi
+# 始终用发布包内脚本，避免服务器旧版踩坑
+staging=\$(mktemp -d)
+tar -xzf '$remoteTar' -C "\$staging"
+DEPLOY_PATH='$deployPath' WEB_ROOT='$webRoot' bash "\$staging/deploy/remote-install.sh" '$remoteTar'
+rm -rf "\$staging"
 rm -f '$remoteTar'
 EOF
 
