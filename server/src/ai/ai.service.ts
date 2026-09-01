@@ -8,6 +8,7 @@ import { DbService } from '../db/db.service'
 import { SkillsService } from '../skills/skills.service'
 import { mapEventRow, mapQuoteRow } from '../utils/mappers'
 import type { EventRow, QuoteRow } from '../types/event'
+import { AiChatStore } from './ai-chat.store'
 import { loadAiConfig, readArchiveText } from './ai.config'
 
 /** 对话消息 */
@@ -22,6 +23,10 @@ export interface ChatRequest {
   /** 是否附带近期崩溃统计（默认 true） */
   includeStats?: boolean
   days?: number
+  /** 已有会话 id；空则首轮成功后新建 */
+  chatId?: string
+  /** 是否写入历史（默认 true；一键解读可关） */
+  persist?: boolean
 }
 
 /** 一键解读请求 */
@@ -36,6 +41,7 @@ export class AiService {
     private readonly dbService: DbService,
     private readonly analyticsService: AnalyticsService,
     private readonly skillsService: SkillsService,
+    private readonly chatStore: AiChatStore,
   ) {}
 
   /** 当前配置是否可用 */
@@ -54,9 +60,11 @@ export class AiService {
   }
 
   /**
-   * 多轮咨询：系统提示 = 档案规则 + 事实摘要
+   * 多轮咨询：系统提示 = 档案规则 + 事实摘要；成功后写入会话历史
    */
-  async chat(body: ChatRequest): Promise<{ reply: string; model: string }> {
+  async chat(
+    body: ChatRequest,
+  ): Promise<{ reply: string; model: string; chatId?: string }> {
     const cfg = loadAiConfig()
     if (!cfg.enabled) {
       throw new ServiceUnavailableException(
@@ -78,7 +86,32 @@ export class AiService {
       ...messages,
     ])
 
-    return { reply, model: cfg.model }
+    if (body.persist === false) {
+      return { reply, model: cfg.model }
+    }
+
+    const fullMessages = [
+      ...messages.filter((m) => m.role === 'user' || m.role === 'assistant'),
+      { role: 'assistant' as const, content: reply },
+    ]
+    const saved = this.chatStore.save(body.chatId, fullMessages)
+
+    return { reply, model: cfg.model, chatId: saved.chatId }
+  }
+
+  /** 会话列表 */
+  listChats(limit?: number) {
+    return this.chatStore.list(limit)
+  }
+
+  /** 会话详情 */
+  getChat(id: string) {
+    return this.chatStore.get(id)
+  }
+
+  /** 删除会话 */
+  removeChat(id: string) {
+    return this.chatStore.remove(id)
   }
 
   /**
@@ -97,6 +130,7 @@ export class AiService {
     return this.chat({
       days,
       includeStats: true,
+      persist: false,
       messages: [
         {
           role: 'user',
@@ -173,9 +207,6 @@ export class AiService {
     )
     lines.push(
       `地点：${formatTop(stats.byLocation.map((x) => `${x.label}×${x.count}`))}`,
-    )
-    lines.push(
-      `照护人：${formatTop(stats.byCaregiver.map((x) => `${x.label}×${x.count}`))}`,
     )
     lines.push(
       `应对：${formatTop(stats.byCoping.map((x) => `${x.key}×${x.count}`))}`,

@@ -9,14 +9,16 @@ alwaysApply: false
 - 密钥只放服务端 `server/.env` 的 `MIA_AI_API_KEY`，前端永不带 key
 - **每次请求** system prompt 附带完整 `Mia档案.md` + 近期统计/事件/语录/技能事实
 - 硬性要求：结合档案回答，优先「已验证清单」；不写回 events/quotes
+- 咨询会话写入 `ai_chats`（可历史查看 / 删除）；分析页「一键解读」不入库
 
 ## 接口
 
 - `GET /api/ai/status`
-- `POST /api/ai/chat` `{ messages, days?, includeStats? }`
+- `POST /api/ai/chat` `{ messages, days?, includeStats?, chatId? }` → `{ reply, model, chatId? }`
+- `GET /api/ai/chats`、`GET /api/ai/chats/:id`、`DELETE /api/ai/chats/:id`
 - `POST /api/ai/insight` `{ days? }`
 
 ## 页面
 
-- `/consult` AI 咨询（快捷键 `I`）
+- `/consult` AI 咨询（快捷键 `I`）+ 历史抽屉
 - 分析页「生成解读」

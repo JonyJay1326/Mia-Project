@@ -75,3 +75,14 @@ CREATE TABLE IF NOT EXISTS skill_marks (
   updated_at  TEXT,
   FOREIGN KEY (skill_id) REFERENCES skills(id)
 );
+
+-- AI 咨询会话（消息以 JSON 存，便于整段读写）
+CREATE TABLE IF NOT EXISTS ai_chats (
+  id          TEXT PRIMARY KEY,
+  title       TEXT NOT NULL,
+  messages    TEXT NOT NULL,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_chats_updated ON ai_chats(updated_at DESC);
