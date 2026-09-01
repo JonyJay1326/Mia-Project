@@ -55,7 +55,10 @@ fi
 
 echo "==> 安装生产依赖（native 模块在服务器编译）"
 cd "$DEPLOY_PATH/server"
-npm ci --omit=dev
+# 含 optional，确保 sharp / better-sqlite3 平台二进制完整
+npm ci --omit=dev --include=optional
+# 若 sharp 仍缺 linux 二进制，强制按当前平台重装
+npm install --omit=dev --os=linux --cpu=x64 sharp better-sqlite3
 
 # 加载 nvm，避免 PM2 落到系统旧 Node
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
