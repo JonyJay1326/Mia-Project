@@ -39,3 +39,5 @@ Thumbs.db
 # 部署（根目录 tar 包忽略；CI 用 dist-release/ 以免 scp-action 跳过 gitignore 文件）
 mia-release.tar.gz
 deploy/.env.deploy
+# 服务器 CI 上传目录（若误同步到本机）
+.ci-upload/

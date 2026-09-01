@@ -43,9 +43,11 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           source: dist-release/mia-release.tar.gz
-          target: /tmp
+          # 不用 /tmp：可能残留只读文件导致 Permission denied
+          target: /opt/mia-project/.ci-upload
           strip_components: 1
           overwrite: true
+          rm: true
 
       - name: Remote install
         uses: appleboy/ssh-action@v1.2.0
@@ -59,7 +61,7 @@ jobs:
             set -euo pipefail
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH || '/opt/mia-project' }}"
             WEB_ROOT="${{ secrets.WEB_ROOT || '/opt/1panel/www/sites/mia-web/index' }}"
-            REMOTE_TAR="/tmp/mia-release.tar.gz"
+            REMOTE_TAR="$DEPLOY_PATH/.ci-upload/mia-release.tar.gz"
             test -f "$REMOTE_TAR"
             # 始终用发布包内脚本，避免服务器上旧版 remote-install.sh 踩坑
             staging=$(mktemp -d)
