@@ -6,7 +6,12 @@ import {
   photoAssetUrl,
   uploadPhoto,
 } from '@/api/photos'
-import type { PhotoRecord } from '@/types/photo'
+import {
+  IMAGE_MAX_BYTES,
+  VIDEO_MAX_BYTES,
+  isVideoMime,
+  type PhotoRecord,
+} from '@/types/photo'
 import { useMiaConfirm } from '@/composables/useMiaConfirm'
 import { formatMonthAge } from '@/utils/date'
 import { dayKey } from '@/utils/timeline'
@@ -50,6 +55,28 @@ function pickFiles() {
   fileInput.value?.click()
 }
 
+/** 客户端校验体积与类型 */
+function validateFile(file: File): string | null {
+  const mime = (file.type || '').toLowerCase()
+  const isVideo = isVideoMime(mime)
+  const isImage =
+    mime === 'image/jpeg' ||
+    mime === 'image/jpg' ||
+    mime === 'image/png' ||
+    mime === 'image/webp' ||
+    mime === 'image/gif'
+  if (!isVideo && !isImage) {
+    return '仅支持图片或 MP4 / WebM 视频'
+  }
+  if (isVideo && file.size > VIDEO_MAX_BYTES) {
+    return '视频不能超过 100MB'
+  }
+  if (isImage && file.size > IMAGE_MAX_BYTES) {
+    return '图片不能超过 20MB'
+  }
+  return null
+}
+
 /** 处理选中的文件（可多选） */
 async function onFilesSelected(e: Event) {
   const input = e.target as HTMLInputElement
@@ -60,38 +87,45 @@ async function onFilesSelected(e: Event) {
   uploading.value = true
   let ok = 0
   for (const file of files) {
+    const invalid = validateFile(file)
+    if (invalid) {
+      showToast(`${file.name}：${invalid}`)
+      continue
+    }
     try {
       await uploadPhoto(file)
       ok += 1
     } catch (err) {
       console.error(err)
-      showToast(`${file.name} 上传失败`)
+      const msg = err instanceof Error ? err.message : '上传失败'
+      showToast(`${file.name}：${msg}`)
     }
   }
   uploading.value = false
   if (ok > 0) {
-    showToast(`已上传 ${ok} 张`)
+    showToast(`已上传 ${ok} 个`)
     await load(true)
   }
 }
 
-/** 打开大图 */
+/** 打开大图 / 播放器 */
 function openViewer(photo: PhotoRecord) {
   viewer.value = photo
 }
 
-/** 关闭大图 */
+/** 关闭查看器 */
 function closeViewer() {
   viewer.value = null
 }
 
-/** 删除当前大图 */
+/** 删除当前媒体 */
 async function removeCurrent() {
   if (!viewer.value) {
     return
   }
+  const isVideo = isVideoMime(viewer.value.mime)
   const ok = await confirm({
-    title: '删除这张照片？',
+    title: isVideo ? '删除这段视频？' : '删除这张照片？',
     message: '删除后不可恢复。',
     confirmText: '删除',
     cancelText: '再想想',
@@ -127,7 +161,8 @@ onMounted(() => {
       <div>
         <h1 class="page__title">📷 相册</h1>
         <p class="page__desc">
-          上传照片；拍摄时间与语录相差 30 分钟内会自动配图。
+          上传照片或短视频（MP4 / WebM，≤100MB）。拍摄时间与语录相差 30
+          分钟内会自动配图。
         </p>
       </div>
       <button
@@ -136,13 +171,13 @@ onMounted(() => {
         :disabled="uploading"
         @click="pickFiles"
       >
-        {{ uploading ? '上传中…' : '上传照片' }}
+        {{ uploading ? '上传中…' : '上传' }}
       </button>
       <input
         ref="fileInput"
         class="sr-only"
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
         multiple
         @change="onFilesSelected"
       />
@@ -153,9 +188,9 @@ onMounted(() => {
 
     <div v-else-if="!items.length" class="mia-empty">
       <span class="mia-empty__emoji">🖼️</span>
-      <p class="mia-empty__text">还没有照片，先上传几张看看</p>
+      <p class="mia-empty__text">还没有照片或视频，先上传几个看看</p>
       <button type="button" class="mia-btn mia-btn--honey" @click="pickFiles">
-        选照片
+        选文件
       </button>
     </div>
 
@@ -167,12 +202,21 @@ onMounted(() => {
         class="mia-card tile"
         @click="openViewer(photo)"
       >
-        <img
-          class="tile__img"
-          :src="photoAssetUrl(photo.thumbUrl)"
-          :alt="photo.originalName || '照片'"
-          loading="lazy"
-        />
+        <div class="tile__media">
+          <img
+            class="tile__img"
+            :src="photoAssetUrl(photo.thumbUrl)"
+            :alt="photo.originalName || '媒体'"
+            loading="lazy"
+          />
+          <span
+            v-if="isVideoMime(photo.mime)"
+            class="tile__badge"
+            aria-hidden="true"
+          >
+            ▶
+          </span>
+        </div>
         <div class="tile__meta">
           <span>{{ shotLabel(photo) }}</span>
           <span v-if="photo.monthAge != null">{{
@@ -197,18 +241,36 @@ onMounted(() => {
       v-if="viewer"
       class="viewer"
       role="dialog"
-      aria-label="查看照片"
+      :aria-label="isVideoMime(viewer.mime) ? '播放视频' : '查看照片'"
       @click.self="closeViewer"
     >
-      <div class="viewer__panel mia-card">
+      <div
+        class="viewer__panel mia-card"
+        :class="{ 'viewer__panel--video': isVideoMime(viewer.mime) }"
+      >
+        <div
+          v-if="isVideoMime(viewer.mime)"
+          class="viewer__stage viewer__stage--video"
+        >
+          <video
+            class="viewer__video"
+            controls
+            playsinline
+            preload="metadata"
+            :src="photoAssetUrl(viewer.fileUrl)"
+          />
+        </div>
         <img
+          v-else
           class="viewer__img"
           :src="photoAssetUrl(viewer.fileUrl)"
           :alt="viewer.originalName || '照片'"
         />
         <div class="viewer__bar">
           <div>
-            <div class="viewer__title">{{ shotLabel(viewer) }}</div>
+            <div class="viewer__title">
+              {{ isVideoMime(viewer.mime) ? '🎬 ' : '' }}{{ shotLabel(viewer) }}
+            </div>
             <div v-if="viewer.monthAge != null" class="viewer__sub">
               {{ formatMonthAge(viewer.monthAge) }}
             </div>
@@ -304,12 +366,34 @@ onMounted(() => {
   color: inherit;
 }
 
+.tile__media {
+  position: relative;
+}
+
 .tile__img {
   display: block;
   width: 100%;
   aspect-ratio: 1;
-  object-fit: cover;
+  object-fit: contain;
   background: var(--c-cream-3);
+}
+
+.tile__badge {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2.5px solid #6b5a4e;
+  background: var(--c-coral);
+  color: #fffdf8;
+  font-size: 14px;
+  box-shadow: var(--shadow-sticker);
+  line-height: 1;
+  padding-left: 2px;
 }
 
 .tile__meta {
@@ -346,6 +430,30 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.viewer__panel--video {
+  width: min(860px, 100%);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(245, 196, 94, 0.28), transparent 42%),
+    radial-gradient(circle at 88% 12%, rgba(169, 139, 196, 0.22), transparent 40%),
+    var(--c-cream-2);
+}
+
+.viewer__stage--video {
+  border: var(--stroke);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: #4a3f38;
+  box-shadow: var(--shadow-sticker);
+}
+
+.viewer__video {
+  display: block;
+  width: 100%;
+  max-height: 68vh;
+  background: #4a3f38;
+  accent-color: var(--c-coral);
 }
 
 .viewer__img {

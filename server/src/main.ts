@@ -17,11 +17,11 @@ async function bootstrap() {
     new FastifyAdapter(),
   )
 
-  // 上传用 Fastify multipart，不是 multer
+  // 上传用 Fastify multipart（图片 20MB / 视频 100MB；视频可再带一张封面）
   await app.register(multipart, {
     limits: {
-      fileSize: 20 * 1024 * 1024,
-      files: 1,
+      fileSize: 100 * 1024 * 1024,
+      files: 2,
     },
   })
 

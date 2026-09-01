@@ -1,5 +1,7 @@
 import { getAuthHeaders, handleUnauthorized, request } from '@/api/client'
 import type { PhotoRecord } from '@/types/photo'
+import { isVideoMime } from '@/types/photo'
+import { captureVideoPoster } from '@/utils/captureVideoPoster'
 
 const BASE = import.meta.env.VITE_API_BASE ?? '/api'
 
@@ -27,11 +29,21 @@ export function fetchPhotos(params?: { limit?: number; before?: string }) {
 }
 
 /**
- * 上传一张照片（multipart 字段名 file）
+ * 上传一张照片或视频（multipart：file；视频可附带 thumb 封面）
  */
 export async function uploadPhoto(file: File): Promise<PhotoRecord> {
   const form = new FormData()
   form.append('file', file)
+
+  if (isVideoMime(file.type)) {
+    try {
+      const poster = await captureVideoPoster(file)
+      const ext = poster.type.includes('webp') ? 'webp' : 'jpg'
+      form.append('thumb', poster, `poster.${ext}`)
+    } catch (e) {
+      console.warn('视频封面截取失败，将使用占位图', e)
+    }
+  }
 
   const res = await fetch(`${BASE}/photos`, {
     method: 'POST',
@@ -44,18 +56,29 @@ export async function uploadPhoto(file: File): Promise<PhotoRecord> {
     handleUnauthorized()
     throw new Error('登录已过期，请重新登录')
   }
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`)
-  }
-  const json = (await res.json()) as {
-    ok: boolean
+  const json = (await res.json().catch(() => null)) as {
+    ok?: boolean
     data?: PhotoRecord
     error?: string
+    message?: string | string[]
+  } | null
+  if (!res.ok) {
+    const msg = Array.isArray(json?.message)
+      ? json.message.join('；')
+      : json?.message || json?.error || `HTTP ${res.status}`
+    throw new Error(msg)
   }
-  if (!json.ok || !json.data) {
-    throw new Error(json.error ?? '上传失败')
+  if (!json?.ok || !json.data) {
+    throw new Error(json?.error ?? '上传失败')
   }
   return json.data
+}
+
+/**
+ * 单条媒体元数据
+ */
+export function fetchPhoto(id: string) {
+  return request<PhotoRecord>(`/photos/${id}`)
 }
 
 /**

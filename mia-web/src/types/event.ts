@@ -55,6 +55,8 @@ export interface EventRecord {
   outcome?: string | null
   caregiver: CaregiverType
   napped?: 0 | 1 | null
+  /** 关联相册媒体（照片或短视频） */
+  photoId?: string | null
   monthAge: number
   createdAt: string
   updatedAt?: string | null

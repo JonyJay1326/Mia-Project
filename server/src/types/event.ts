@@ -55,6 +55,8 @@ export interface EventInput {
   outcome?: string | null
   caregiver: CaregiverType
   napped?: 0 | 1 | null
+  /** 关联相册媒体（照片或短视频） */
+  photoId?: string | null
   monthAge?: number
 }
 
@@ -106,6 +108,7 @@ export interface EventRow {
   caregiver: string | null
   napped: number | null
   month_age: number | null
+  photo_id: string | null
   created_at: string
   updated_at: string | null
 }

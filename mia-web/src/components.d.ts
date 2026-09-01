@@ -17,6 +17,7 @@ declare module 'vue' {
     ElDatePicker: typeof import('element-plus/es')['ElDatePicker']
     ElTimePicker: typeof import('element-plus/es')['ElTimePicker']
     EventItem: typeof import('./components/EventItem.vue')['default']
+    EventMediaAttach: typeof import('./components/EventMediaAttach.vue')['default']
     MiaConfirmDialog: typeof import('./components/MiaConfirmDialog.vue')['default']
     MiaDateTimePicker: typeof import('./components/MiaDateTimePicker.vue')['default']
     MiaFormDialog: typeof import('./components/MiaFormDialog.vue')['default']

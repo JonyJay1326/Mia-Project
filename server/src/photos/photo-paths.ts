@@ -35,7 +35,15 @@ export function extFromMime(mime: string): string {
   if (mime === 'image/webp') return '.webp'
   if (mime === 'image/gif') return '.gif'
   if (mime === 'image/heic' || mime === 'image/heif') return '.heic'
+  if (mime === 'video/mp4') return '.mp4'
+  if (mime === 'video/webm') return '.webm'
   return '.jpg'
+}
+
+/** 是否为支持的视频类型 */
+export function isVideoMime(mime: string): boolean {
+  const m = mime.toLowerCase()
+  return m === 'video/mp4' || m === 'video/webm'
 }
 
 /**

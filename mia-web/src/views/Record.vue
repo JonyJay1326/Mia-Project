@@ -5,6 +5,7 @@ import SceneCards from '@/components/SceneCards.vue'
 import ChipGroup from '@/components/ChipGroup.vue'
 import TypeChip from '@/components/TypeChip.vue'
 import MiaDateTimePicker from '@/components/MiaDateTimePicker.vue'
+import EventMediaAttach from '@/components/EventMediaAttach.vue'
 import type { Scene } from '@/config/scenes'
 import {
   CAREGIVER_CHIPS,
@@ -60,6 +61,7 @@ const form = reactive({
   durationMin: null as number | null,
   coping: [] as string[],
   outcome: '',
+  photoId: null as string | null,
 })
 
 /** 当前月龄展示 */
@@ -100,6 +102,7 @@ function onSelectScene(scene: Scene) {
   form.chips = []
   form.summary = ''
   form.coping = []
+  form.photoId = null
   showExtra.value = false
 }
 
@@ -140,6 +143,7 @@ function resetAfterSave() {
   form.coping = []
   form.outcome = ''
   form.napped = null
+  form.photoId = null
   showExtra.value = false
   activeSceneId.value = null
   void loadRecent()
@@ -210,6 +214,7 @@ async function submit() {
     outcome: form.outcome || null,
     caregiver: form.caregiver,
     napped: form.napped,
+    photoId: form.photoId,
     monthAge: monthAge(BIRTH_DATE, happenedAt),
   }
 
@@ -415,48 +420,51 @@ onUnmounted(() => {
         {{ showExtra ? '收起补充详情' : '▸ 补充详情（可稍后）' }}
       </button>
 
-      <div v-if="showExtra && isMeltdown" class="form__extra">
-        <label class="form__label">强度 1–5</label>
-        <div class="form__chips">
-          <button
-            v-for="n in 5"
-            :key="n"
-            type="button"
-            class="mia-chip"
-            :class="{ 'is-active': form.intensity === n }"
-            @click="form.intensity = n"
-          >
-            {{ n }}
-          </button>
-        </div>
-        <label class="form__label">时长（分钟）</label>
-        <input
-          v-model.number="form.durationMin"
-          class="mia-input"
-          type="number"
-          min="0"
-          placeholder="大概几分钟"
-        />
-        <label class="form__label">应对方式</label>
-        <div class="form__chips">
-          <button
-            v-for="label in COPING_CHIPS"
-            :key="label"
-            type="button"
-            class="mia-chip"
-            :class="{ 'is-active': form.coping.includes(label) }"
-            @click="toggleCoping(label)"
-          >
-            {{ label }}
-          </button>
-        </div>
-        <label class="form__label">结果</label>
-        <input
-          v-model="form.outcome"
-          class="mia-input"
-          type="text"
-          placeholder="后来怎样了"
-        />
+      <div v-if="showExtra" class="form__extra">
+        <template v-if="isMeltdown">
+          <label class="form__label">强度 1–5</label>
+          <div class="form__chips">
+            <button
+              v-for="n in 5"
+              :key="n"
+              type="button"
+              class="mia-chip"
+              :class="{ 'is-active': form.intensity === n }"
+              @click="form.intensity = n"
+            >
+              {{ n }}
+            </button>
+          </div>
+          <label class="form__label">时长（分钟）</label>
+          <input
+            v-model.number="form.durationMin"
+            class="mia-input"
+            type="number"
+            min="0"
+            placeholder="大概几分钟"
+          />
+          <label class="form__label">应对方式</label>
+          <div class="form__chips">
+            <button
+              v-for="label in COPING_CHIPS"
+              :key="label"
+              type="button"
+              class="mia-chip"
+              :class="{ 'is-active': form.coping.includes(label) }"
+              @click="toggleCoping(label)"
+            >
+              {{ label }}
+            </button>
+          </div>
+          <label class="form__label">结果</label>
+          <input
+            v-model="form.outcome"
+            class="mia-input"
+            type="text"
+            placeholder="后来怎样了"
+          />
+        </template>
+        <EventMediaAttach v-model:photo-id="form.photoId" />
       </div>
 
       <div class="form__actions">

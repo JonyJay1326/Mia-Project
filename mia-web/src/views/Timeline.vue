@@ -3,7 +3,9 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import EventItem from '@/components/EventItem.vue'
 import TypeChip from '@/components/TypeChip.vue'
+import EventMediaAttach from '@/components/EventMediaAttach.vue'
 import { deleteEvent, deleteQuote, fetchEvents, fetchQuotesGrouped, patchEvent } from '@/api/events'
+import { photoAssetUrl } from '@/api/photos'
 import type { EventRecord, QuoteRecord, TimelineItemType } from '@/types/event'
 import { formatMonthAge, monthAge, BIRTH_DATE } from '@/utils/date'
 import {
@@ -163,7 +165,10 @@ function openItem(item: TimelineItem) {
   eventsStore.selectEvent(item.id)
   editing.value = false
   if (item.event) {
-    editForm.value = { ...item.event }
+    editForm.value = {
+      ...item.event,
+      photoId: item.event.photoId ?? null,
+    }
   }
   drawerOpen.value = true
 }
@@ -428,6 +433,21 @@ onUnmounted(() => {
               </li>
               <li v-if="selected.event.outcome">结果：{{ selected.event.outcome }}</li>
             </ul>
+            <a
+              v-if="selected.event.photoId"
+              class="drawer__media mia-card"
+              :href="photoAssetUrl(`/photos/${selected.event.photoId}/file?v=original`)"
+              target="_blank"
+              rel="noopener"
+              @click.stop
+            >
+              <img
+                class="drawer__media-thumb"
+                :src="photoAssetUrl(`/photos/${selected.event.photoId}/file?v=thumb`)"
+                alt="附件预览"
+              />
+              <span class="drawer__media-caption">查看附件</span>
+            </a>
             <div class="drawer__actions">
               <button type="button" class="mia-btn mia-btn--primary" @click="editing = true">
                 编辑 / 补详情
@@ -439,28 +459,31 @@ onUnmounted(() => {
           <template v-else>
             <label class="drawer__label">摘要</label>
             <input v-model="editForm.summary" class="mia-input" type="text" />
-            <label class="drawer__label">强度</label>
-            <div class="drawer__chips">
-              <button
-                v-for="n in 5"
-                :key="n"
-                type="button"
-                class="mia-chip"
-                :class="{ 'is-active': editForm.intensity === n }"
-                @click="editForm.intensity = n"
-              >
-                {{ n }}
-              </button>
-            </div>
-            <label class="drawer__label">时长（分钟）</label>
-            <input
-              v-model.number="editForm.durationMin"
-              class="mia-input"
-              type="number"
-              min="0"
-            />
+            <template v-if="selected.event.type === 'meltdown'">
+              <label class="drawer__label">强度</label>
+              <div class="drawer__chips">
+                <button
+                  v-for="n in 5"
+                  :key="n"
+                  type="button"
+                  class="mia-chip"
+                  :class="{ 'is-active': editForm.intensity === n }"
+                  @click="editForm.intensity = n"
+                >
+                  {{ n }}
+                </button>
+              </div>
+              <label class="drawer__label">时长（分钟）</label>
+              <input
+                v-model.number="editForm.durationMin"
+                class="mia-input"
+                type="number"
+                min="0"
+              />
+            </template>
             <label class="drawer__label">结果</label>
             <input v-model="editForm.outcome" class="mia-input" type="text" />
+            <EventMediaAttach v-model:photo-id="editForm.photoId" />
             <div class="drawer__actions">
               <button
                 type="button"
@@ -666,6 +689,32 @@ onUnmounted(() => {
   padding-left: 18px;
   color: var(--c-ink);
   line-height: 1.7;
+}
+
+.drawer__media {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  margin-bottom: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.drawer__media-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  border: var(--stroke-light);
+  background: var(--c-cream-3);
+  flex-shrink: 0;
+}
+
+.drawer__media-caption {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--c-sky);
 }
 
 .drawer__actions {
