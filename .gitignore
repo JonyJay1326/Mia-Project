@@ -36,6 +36,6 @@ Thumbs.db
 # 本地临时
 *.local
 
-# 部署
+# 部署（根目录 tar 包忽略；CI 用 dist-release/ 以免 scp-action 跳过 gitignore 文件）
 mia-release.tar.gz
 deploy/.env.deploy

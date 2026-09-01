@@ -27,8 +27,13 @@ jobs:
             server/package-lock.json
             mia-web/package-lock.json
 
+      # 注意：不要输出到仓库根目录的 mia-release.tar.gz（在 .gitignore 中），
+      # appleboy/scp-action 会跳过被 gitignore 的文件，导致 tar: empty archive
       - name: Build release tarball
-        run: bash deploy/build-release.sh mia-release.tar.gz
+        run: |
+          mkdir -p dist-release
+          bash deploy/build-release.sh "$PWD/dist-release/mia-release.tar.gz"
+          ls -lh dist-release/mia-release.tar.gz
 
       - name: Upload release to server
         uses: appleboy/scp-action@v0.1.7
@@ -37,8 +42,10 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          source: mia-release.tar.gz
+          source: dist-release/mia-release.tar.gz
           target: /tmp
+          strip_components: 1
+          overwrite: true
 
       - name: Remote install
         uses: appleboy/ssh-action@v1.2.0
@@ -53,6 +60,7 @@ jobs:
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH || '/opt/mia-project' }}"
             WEB_ROOT="${{ secrets.WEB_ROOT || '/opt/1panel/www/sites/mia-web/index' }}"
             REMOTE_TAR="/tmp/mia-release.tar.gz"
+            test -f "$REMOTE_TAR"
             mkdir -p "$DEPLOY_PATH/deploy"
             if [[ -f "$DEPLOY_PATH/deploy/remote-install.sh" ]]; then
               DEPLOY_PATH="$DEPLOY_PATH" WEB_ROOT="$WEB_ROOT" bash "$DEPLOY_PATH/deploy/remote-install.sh" "$REMOTE_TAR"
