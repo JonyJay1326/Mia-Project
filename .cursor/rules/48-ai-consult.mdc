@@ -10,6 +10,7 @@ alwaysApply: false
 - **每次请求** system prompt 附带完整 `Mia档案.md` + 近期统计/事件/语录/技能事实
 - 硬性要求：结合档案回答，优先「已验证清单」；不写回 events/quotes
 - 咨询会话写入 `ai_chats`（可历史查看 / 删除）；分析页「一键解读」不入库
+- 咨询页「思考中」气泡有弹跳圆点动效（尊重 `prefers-reduced-motion`）
 
 ## 接口
 
@@ -17,8 +18,10 @@ alwaysApply: false
 - `POST /api/ai/chat` `{ messages, days?, includeStats?, chatId? }` → `{ reply, model, chatId? }`
 - `GET /api/ai/chats`、`GET /api/ai/chats/:id`、`DELETE /api/ai/chats/:id`
 - `POST /api/ai/insight` `{ days? }`
+- `POST /api/ai/skill-suggest` `{ label }` → 预览领域/emoji（不写库）
+- `POST /api/ai/scene-suggest` `{ label }` → 预览 emoji（不写库）
 
 ## 页面
 
-- `/consult` AI 咨询（快捷键 `I`）+ 历史抽屉
+- `/consult` AI 咨询（快捷键 `I`）+ 历史抽屉 + 新对话
 - 分析页「生成解读」

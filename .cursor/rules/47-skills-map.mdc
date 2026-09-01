@@ -5,11 +5,16 @@ alwaysApply: false
 
 # 技能地图
 
-范围：按领域展示可观察技能；三态标记（未观察 / 刚出现 / 已掌握）。不做常模诊断、不做 AI。
+范围：按领域展示可观察技能；三态（未观察 / 刚出现 / 已掌握）。不做常模诊断。
 
-- [x] **SK-1** `skills` + `skill_marks` 表；目录来自档案
-- [x] **SK-2** `GET /api/skills`、`PUT /api/skills/:id/mark`
+- [x] **SK-1** `skills` + `skill_marks` 表；目录来自档案；`is_custom`
+- [x] **SK-2** `GET /api/skills`、`PUT /api/skills/:id/mark`、`POST /api/skills`（自定义，可 AI 分类）
 - [x] **SK-3** 档案 2026-08-30 已确认项幂等标为 done
 - [x] **SK-4** 前端 `/skills` + 侧边栏「技能」+ 快捷键 `S`
+- [x] **SK-5** `POST /api/ai/skill-suggest` 预览 emoji/领域（不写库）
+- [ ] **SK-6** 备注编辑 UI + 暴露备注接口（service `updateNote` 已有，路由未挂）
+- [ ] **SK-7** 删除自定义技能 UI + `DELETE /api/skills/:id`（service `removeCustom` 已有，路由未挂）
 
-明确不做：百分位常模、倒退预警算法、与 events 自动双向同步（以后可加）。
+`SkillItem` 含 `isCustom`；`mark` 可带 `note`，前端 cycle 暂未传。
+
+明确不做：百分位常模、倒退预警算法、与 events 自动双向同步。

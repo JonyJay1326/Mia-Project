@@ -6,11 +6,24 @@ alwaysApply: false
 
 # 后端与数据约定
 
-## 两张表（阶段一）
+## 表结构
 
-`events`（事件）+ `quotes`（语录），详见规格第 3 节和 4.6.2 节。
+权威：`server/src/db/schema.sql`。
 
-**`type` 里没有 `quote`** —— 语录单独建表，别混进 events。
+| 表 | 说明 |
+|---|---|
+| `events` | 事件（**type 无 quote**） |
+| `quotes` | 语录 |
+| `photos` | 相册 |
+| `skills` | 技能目录（`is_custom`、`created_at`） |
+| `skill_marks` | 掌握标记（无行 = todo） |
+| `ai_chats` | AI 咨询会话（messages JSON） |
+
+**`events.type`：** `meltdown | skill | daily | emotion | sleep | diet | social | medical`  
+Legacy 只读：`health | question`。
+
+**地点：** `home | outdoor | mall | grandparents | taoshudi | tongtong | school | other`  
+**记录人：** 类型含 `grandma|grandpa`，**录入仅 mom/dad**。
 
 ## ⚠️ POST 必须幂等（最容易踩的坑）
 
@@ -19,8 +32,6 @@ alwaysApply: false
 ```sql
 INSERT OR IGNORE INTO events (...) VALUES (...)
 ```
-
-不是数据库自增 id —— 离线状态下也要能建记录。
 
 ## 时间戳
 
@@ -36,68 +47,59 @@ INSERT OR IGNORE INTO events (...) VALUES (...)
 function monthAge(birthDate: string, at: string): number {
   const b = new Date(birthDate), a = new Date(at)
   let m = (a.getFullYear() - b.getFullYear()) * 12 + (a.getMonth() - b.getMonth())
-  if (a.getDate() < b.getDate()) m--      // 没到当月生日那天就不算满月
+  if (a.getDate() < b.getDate()) m--
   return m
 }
 ```
 
-`month_age` 在 events 和 quotes 里都是**冗余字段**（写入时算好，查询时省事），
-`quotes` 里是分组展示的核心，不能为空。
+`month_age` 在 events 和 quotes 里都是**冗余字段**。
 
 ## 可空字段设计
 
-崩溃详情（`intensity` / `duration_min` / `coping` / `outcome`）**全部可空**，
-支持「先提交，后补详情」——录入时崩着呢，没空填这么多。
+崩溃详情（`intensity` / `duration_min` / `coping` / `outcome`）**全部可空**。  
+`napped`（当日是否午睡）用来验证「睡了 vs 没睡」的情绪差异。
 
-`napped`（当日是否午睡）是 Mia 专用字段，用来验证「睡了 vs 没睡」的情绪差异。
+## 语录约定
 
-## 语录（渺言妙语）特殊约定
-
-- `content` 是**原话逐字记录，不加工** —— 写「她对声音好奇」就毁了，要写她原话
-- `note` 是我的解读，跟 `content` 分开存，展示时视觉区分
-- **宁可多记不筛选**，录入成本要低到不需要犹豫
-- 展示**按月龄分组，不按日期** —— 按日期是流水账，按月龄是一部认知发展史
+- `content` 原话逐字，不加工
+- `note` 是我的解读，跟 `content` 分开
+- 展示**按月龄分组，不按日期**
 
 ## API 约定
 
-统一响应格式 `{ ok: boolean, data?: T, error?: string }`。
-
-路由（有全局前缀 `api`）：
+统一响应 `{ ok: boolean, data?: T, error?: string }`。全局前缀 `api`。
 
 ```
-POST   /events              幂等创建
-GET    /events?limit=50&before=<iso>
-GET    /events/:id
-PATCH  /events/:id          补充详情
-DELETE /events/:id
-
-POST   /quotes
-GET    /quotes              按月龄分组返回
-GET    /quotes?random=1     随机一条（毯子精灵气泡用）
-GET    /quotes/:id
-PATCH  /quotes/:id
-DELETE /quotes/:id
-
+POST/GET/PATCH/DELETE /events
+POST/GET/PATCH/DELETE /quotes   （GET ?random=1 随机一条）
 GET    /health
-GET    /analytics/meltdown?days=60   崩溃统计（阶段二）
+GET    /analytics/meltdown?days=60   # 无 byCaregiver / byWeekday
 
-POST   /photos              multipart 上传（字段 file）
-GET    /photos?limit=&before=
-GET    /photos/:id
+POST/GET/DELETE /photos
 GET    /photos/:id/file?v=thumb|original
-DELETE /photos/:id
 
 GET    /skills
-PUT    /skills/:id/mark
+POST   /skills                       # 自定义
+PUT    /skills/:id/mark              # todo|emerging|done，可带 note
+# 进行中：备注专用路由、DELETE 自定义（service 有，controller 未挂）
 
 GET    /ai/status
 POST   /ai/chat
+GET/DELETE /ai/chats、GET /ai/chats/:id
 POST   /ai/insight
+POST   /ai/skill-suggest
+POST   /ai/scene-suggest
+
+GET    /auth/status
+POST   /auth/login
+GET    /auth/me
 ```
 
-阶段一**不做应用内鉴权**，用 Nginx Basic Auth 挡（规格 8.2）。
-照片落盘在 `server/data/photos/`，**务必走 Nginx Basic Auth**，别把 3000 端口裸露公网。
-技能目录在 `server/src/skills/skill-catalog.ts`，启动时 upsert；档案已知项会幂等标为 done。
+**公网主挡 Nginx Basic Auth**；可选 `MIA_AUTH_*` 应用内 Bearer。  
+照片落盘 `server/data/photos/`，别把 API 端口裸露公网。  
+技能目录 `skill-catalog.ts` 启动 upsert；档案已知项幂等标 done。
+
+前端：`DELETE`/无 body **不要**默认 `Content-Type: application/json`。
 
 AI 默认 DeepSeek（`server/.env`）：
 
@@ -105,5 +107,5 @@ AI 默认 DeepSeek（`server/.env`）：
 MIA_AI_API_KEY=sk-...
 MIA_AI_BASE_URL=https://api.deepseek.com/v1
 MIA_AI_MODEL=deepseek-chat
-# MIA_ARCHIVE_PATH=指向 Mia档案.md（可选，默认自动找）
+# MIA_ARCHIVE_PATH=指向 Mia档案.md（可选）
 ```

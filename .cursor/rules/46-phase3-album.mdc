@@ -1,22 +1,21 @@
 ---
-description: 阶段三任务清单 - 相册（先做）；AI / 技能地图后置
+description: 阶段三任务清单 - 相册
 alwaysApply: false
 ---
 
-# 阶段三任务清单
+# 阶段三 · 相册任务清单
 
-先做 **相册**。AI 咨询、技能地图另开。
+本文件只管相册。技能见 `47-skills-map.mdc`，AI 见 `48-ai-consult.mdc`（均已另开并落地）。
 
 ## 相册 V1
 
 - [x] **P3-1** `photos` 表 + `data/photos/{original,thumb}` 落盘
 - [x] **P3-2** `@fastify/multipart` 上传；`sharp` 缩略图；EXIF 取拍摄时间
 - [x] **P3-3** `GET/POST/DELETE /api/photos` + 文件流 `.../file?v=thumb|original`
-- [x] **P3-4** 语录 `said_at` ±30 分钟自动挂 `photo_id`（上传侧 + 新建语录侧）
+- [x] **P3-4** 语录 `said_at` ±30 分钟自动挂 `photo_id`
 - [x] **P3-5** 前端 `/album` 网格 + 大图 + 上传；语录墙展示配图
 - [ ] **P3-6** 真机上传验收；确认 Basic Auth 后相册不裸奔
 
 ## 明确后置
 
-- AI 咨询 / 打标
 - 视频、WebDAV 同步目录、批量文件夹扫描
