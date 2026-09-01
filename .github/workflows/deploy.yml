@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
   workflow_dispatch:
 
 concurrency:
@@ -14,7 +15,32 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: SSH deploy
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            mia-web/package-lock.json
+
+      - name: Build release tarball
+        run: bash deploy/build-release.sh mia-release.tar.gz
+
+      - name: Upload release to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          source: mia-release.tar.gz
+          target: /tmp
+
+      - name: Remote install
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -23,6 +49,17 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           command_timeout: 20m
           script: |
-            set -e
-            cd "${{ secrets.DEPLOY_PATH || '/opt/mia-project' }}"
-            bash deploy/deploy.sh
+            set -euo pipefail
+            DEPLOY_PATH="${{ secrets.DEPLOY_PATH || '/opt/mia-project' }}"
+            WEB_ROOT="${{ secrets.WEB_ROOT || '/opt/1panel/www/sites/mia-web/index' }}"
+            REMOTE_TAR="/tmp/mia-release.tar.gz"
+            mkdir -p "$DEPLOY_PATH/deploy"
+            if [[ -f "$DEPLOY_PATH/deploy/remote-install.sh" ]]; then
+              DEPLOY_PATH="$DEPLOY_PATH" WEB_ROOT="$WEB_ROOT" bash "$DEPLOY_PATH/deploy/remote-install.sh" "$REMOTE_TAR"
+            else
+              staging=$(mktemp -d)
+              tar -xzf "$REMOTE_TAR" -C "$staging"
+              DEPLOY_PATH="$DEPLOY_PATH" WEB_ROOT="$WEB_ROOT" bash "$staging/deploy/remote-install.sh" "$REMOTE_TAR"
+              rm -rf "$staging"
+            fi
+            rm -f "$REMOTE_TAR"

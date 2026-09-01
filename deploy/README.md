@@ -1,125 +1,171 @@
-# 部署说明（1Panel · IP + HTTP · 应用登录）
+# 部署说明（1Panel · IP + HTTP · 打包上传）
 
-推送到 GitHub `main` 分支后，Actions 会 SSH 到服务器执行 `deploy/deploy.sh` 自动构建并重启。
+**不在服务器克隆 Git。** 在本机或 GitHub Actions 构建发布包，scp 上传到服务器后解压安装。
 
 ## 架构
 
 ```
-浏览器 → Nginx (80) → 静态 dist/
-                  └→ /api → 127.0.0.1:MIA_PORT (PM2 mia-api)
+本机 / Actions → 构建 dist → tar.gz → scp → 服务器解压 + npm ci → PM2
+
+浏览器 → Nginx (:8080) → 静态 /opt/1panel/www/sites/mia-web/index/
+                      └→ /api → 127.0.0.1:MIA_PORT (PM2 mia-api @ /opt/mia-project)
+
 ```
 
-- 后端**只监听** `127.0.0.1`（默认端口 `3000`，可用 `MIA_PORT` 改）
-- **前端生产环境不占端口**：由 Nginx 直接托管 `dist/`，走 80/443
-- 应用内登录：`server/.env` 配置 `MIA_AUTH_*`
-- 可选 Nginx Basic Auth 额外挡扫描（见 `nginx.mia.conf.example`）
+- 后端**只监听** `127.0.0.1`（默认 `3000`，可用 `MIA_PORT` 改，建议 `3001` 避开已有服务）
+- **前端生产不占端口**：Nginx 托管 `dist/`
+- `better-sqlite3` / `sharp` 在**服务器**上 `npm ci --omit=dev` 编译（勿从 Windows 拷 node_modules）
 
 ---
 
-## 一、服务器首次初始化（只做一次）
+## 一、本机一键部署（推荐）
+
+### 1. 配置 SSH（只做一次）
+
+```powershell
+# 复制并编辑（不提交 Git）
+copy deploy\.env.deploy.example deploy\.env.deploy
+```
+
+```bash
+# deploy/.env.deploy
+MIA_SSH_HOST=你的服务器IP
+MIA_SSH_USER=root
+MIA_SSH_PORT=22
+MIA_DEPLOY_PATH=/opt/mia-project
+MIA_WEB_ROOT=/opt/1panel/www/sites/mia-web/index
+```
+
+本机需已安装 **OpenSSH**（Windows 10+ 自带 `ssh` / `scp`）和 **Node 20+**。
+
+### 2. 执行
+
+**Windows（PowerShell）：**
+
+```powershell
+.\deploy\pack-and-upload.ps1
+```
+
+**Git Bash / WSL / macOS / Linux：**
+
+```bash
+chmod +x deploy/pack-and-upload.sh deploy/build-release.sh deploy/remote-install.sh
+bash deploy/pack-and-upload.sh
+```
+
+脚本会：构建前后端 → 生成 `mia-release.tar.gz` → 上传 → 远程安装并重启 PM2。
+
+**默认只执行 `npm run build`**，不会 `npm ci`（避免 dev 服务占用 `better-sqlite3` 导致 EPERM）。依赖有变时加 `-InstallDeps`，且需先停本地 nest 进程：
+
+```powershell
+.\deploy\pack-and-upload.ps1 -InstallDeps
+```
+
+### 3. 仅打发布包（不上传）
+
+```bash
+bash deploy/build-release.sh
+# 产物：项目根目录 mia-release.tar.gz
+```
+
+---
+
+## 二、服务器首次初始化（只做一次）
+
+服务器**不需要 git**，只需 Node、PM2、构建工具。
 
 ### 1. 依赖
 
 ```bash
-# Node 20+（1Panel 应用商店或 nvm）
+# 必须 Node 20+（旧版会报 Cannot find module 'node:path'，Nest 也无法运行）
 node -v
 npm -v
+# 若仍是 v12/v14，用 nvm 或 1Panel 应用商店装 Node 20，再：
+# npm install -g pm2
 
-# PM2
 npm install -g pm2
 
-# 构建 native 模块（better-sqlite3 / sharp）
-# Debian/Ubuntu:
+# native 模块编译（Debian/Ubuntu）
 sudo apt-get update
-sudo apt-get install -y git build-essential python3
+sudo apt-get install -y build-essential python3 rsync
 ```
 
-### 2. 克隆代码
+### 2. 目录
 
 ```bash
 sudo mkdir -p /opt/mia-project
 sudo chown "$USER":"$USER" /opt/mia-project
-git clone https://github.com/你的用户名/Mia-Project.git /opt/mia-project
-cd /opt/mia-project
 ```
 
-### 3. 配置环境变量（不提交 Git）
+### 3. 首次部署
+
+在本机执行 `pack-and-upload`；若服务器尚无 `server/.env`，脚本会从 `.env.example` 生成并**退出**，提示你先编辑：
 
 ```bash
-cp server/.env.example server/.env
-nano server/.env
+nano /opt/mia-project/server/.env
 ```
 
 至少填写：
 
 ```bash
-# AI 咨询
 MIA_AI_API_KEY=sk-...
-
-# 应用内登录（必填，否则不会跳转登录页）
 MIA_AUTH_USERNAME=mia
 MIA_AUTH_PASSWORD=强密码
 MIA_AUTH_SECRET=随机长字符串
 MIA_AUTH_TOKEN_DAYS=30
+MIA_PORT=3001
 ```
 
-确认 `Mia档案.md` 在项目根目录（AI 咨询会读）。
+确认 `Mia档案.md` 会随发布包同步到 `/opt/mia-project/`（AI 咨询读取）。
 
-### 4. 确认端口（与已有服务错开）
+### 4. 确认端口
 
 ```bash
 ss -tlnp | grep -E ':3000|:3001'
 ```
 
-若 **3000 已被占用**（如班主任管理平台），在 `server/.env` 改用其他端口：
+若 3000 已被占用（如班主任管理平台），`.env` 设 `MIA_PORT=3001`，Nginx 反代同步改端口。
+
+### 5. 数据库
 
 ```bash
-MIA_PORT=3001
-```
-
-Nginx 反代也要改成同一端口：
-
-```nginx
-proxy_pass http://127.0.0.1:3001/api/;
-```
-
-本地开发端口（`5173` / `3000`）与服务器无关，不用改。
-
-### 5. 数据库目录
-
-```bash
-mkdir -p server/data
+mkdir -p /opt/mia-project/server/data
 # 若从本机迁移，把 mia.db 拷到 server/data/
 ```
 
-### 6. 首次构建与启动
+### 6. 再次部署 + PM2 开机自启
+
+本机再跑一次 `pack-and-upload`，然后在服务器：
 
 ```bash
-chmod +x deploy/deploy.sh
-bash deploy/deploy.sh
-
-# 开机自启
 pm2 startup
 pm2 save
+curl -s http://127.0.0.1:3001/api/health
 ```
 
-### 7. 确认 API 存活
+若 `pm2 logs` 出现 `Unexpected token '?'`，说明应用被系统旧 Node 启动了。用 **nvm 的 Node 20+** 执行：
 
 ```bash
-# 按 .env 里的 MIA_PORT 检查，默认 3000
-curl -s http://127.0.0.1:3001/api/health
+which node   # 应类似 /root/.nvm/versions/node/v24.x.x/bin/node
+pm2 delete mia-api
+pm2 start /opt/mia-project/deploy/ecosystem.config.cjs
+pm2 save
 ```
 
 ---
 
-## 二、1Panel / Nginx 静态站点
+## 三、1Panel / Nginx 静态站点（与 classpilot 共用机：方案 A）
 
-1. 新建网站，根目录：`/opt/mia-project/mia-web/dist`
-2. 站点域名填**服务器 IP**
-3. 反向代理：`/api` → `http://127.0.0.1:3001`（与 `MIA_PORT` 一致）
-4. 参考 `deploy/nginx.mia.conf.example`
+classpilot 继续用 **80**；Mia 新建站监听 **8080**。
 
-SPA 需要：
+1. 网站 → 创建网站 → 静态网站；主域名填服务器 IP；HTTP 端口填 **8080**
+2. 网站目录 root 使用 1Panel 默认：`/opt/1panel/www/sites/mia-web/index`（部署脚本会直接同步到此目录）
+3. 反向代理：代理路径 `/api` → `http://127.0.0.1:3001`（与 `MIA_PORT` 一致）
+4. 伪静态：`try_files $uri $uri/ /index.html;`
+5. 云服务器安全组 / 防火墙放行 **8080**
+6. 浏览器访问：`http://服务器IP:8080`
+
+参考 `deploy/nginx.mia.conf.example`。
 
 ```nginx
 location / {
@@ -129,69 +175,48 @@ location / {
 
 ---
 
-## 三、GitHub 自动部署
+## 四、GitHub Actions 自动部署
 
-### 1. 服务器 SSH 密钥
+CI 在 Ubuntu 上构建发布包，scp 到服务器，执行 `remote-install.sh`。
 
-在**服务器**生成专用于部署的密钥对（或使用已有）：
-
-```bash
-ssh-keygen -t ed25519 -C "github-deploy-mia" -f ~/.ssh/github_deploy_mia -N ""
-cat ~/.ssh/github_deploy_mia.pub >> ~/.ssh/authorized_keys
-```
-
-把**私钥**内容复制出来，待会填到 GitHub Secret。
-
-### 2. GitHub Secrets
-
-仓库 → Settings → Secrets and variables → Actions → New repository secret：
+### Secrets
 
 | Secret | 说明 |
 |--------|------|
 | `SSH_HOST` | 服务器 IP |
-| `SSH_USER` | SSH 用户名（如 `root` 或面板用户） |
-| `SSH_PRIVATE_KEY` | 私钥全文（`github_deploy_mia`） |
+| `SSH_USER` | SSH 用户名 |
+| `SSH_PRIVATE_KEY` | 私钥全文 |
 | `SSH_PORT` | 可选，默认 22 |
-| `DEPLOY_PATH` | 可选，默认 `/opt/mia-project` |
+| `DEPLOY_PATH` | 可选，默认 `/opt/mia-project`（后端） |
+| `WEB_ROOT` | 可选，默认 `/opt/1panel/www/sites/mia-web/index`（前端） |
 
-### 3. 触发方式
+### 触发
 
-- 推送到 `main` 分支自动部署
+- 推送到 `main` 或 `develop`
 - 或 Actions 页手动 **Run workflow**
 
-### 4. 查看日志
-
-GitHub → Actions → 最新 Deploy to Server 运行记录。
-
 ---
 
-## 四、手动部署（不用 Actions 时）
+## 五、发布包内容
 
-```bash
-cd /opt/mia-project
-bash deploy/deploy.sh
-```
-
----
-
-## 五、本地构建（可选）
-
-```bash
-cd mia-web && npm ci && npm run build
-cd ../server && npm ci && npm run build
-```
-
-产物：`mia-web/dist/`、`server/dist/`
+| 包含 | 不包含（留在服务器） |
+|------|---------------------|
+| 前端 dist → `WEB_ROOT`（1Panel `mia-web/index`） | `server/.env` |
+| `server/dist/` → `DEPLOY_PATH` | `server/data/` |
+| `server/package.json` + lock | `node_modules/`（服务器重装） |
+| `deploy/ecosystem.config.cjs` | |
+| `Mia档案.md` | |
+| `deploy/remote-install.sh` | |
 
 ---
 
 ## 六、验收清单
 
-- [ ] `http://IP` 打开 → 应用登录页
-- [ ] 登录后能看时间线、快速记录
-- [ ] 手机同一地址录入一条 ≤ 15 秒
+- [ ] `http://IP` → 应用登录页
+- [ ] 登录后时间线、快速记录正常
+- [ ] 手机录入一条 ≤ 15 秒
 - [ ] AI 咨询能回复（需 `MIA_AI_API_KEY`）
-- [ ] 推送到 `main` 后 Actions 绿勾，页面更新生效
+- [ ] 本机 `pack-and-upload` 或 Actions 绿勾后页面更新
 
 ---
 

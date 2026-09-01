@@ -35,3 +35,7 @@ Thumbs.db
 
 # 本地临时
 *.local
+
+# 部署
+mia-release.tar.gz
+deploy/.env.deploy
