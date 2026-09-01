@@ -29,6 +29,7 @@ async function loadSharp() {
       '图片处理模块 sharp 未正确安装，请在服务器执行: npm install --os=linux --cpu=x64 sharp',
     )
   }
+}
 
 /** 列表查询参数 */
 interface ListParams {
