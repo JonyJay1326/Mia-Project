@@ -22,10 +22,37 @@ export const CHIPS_BY_TYPE: Record<EventType, string[]> = {
   skill: ['自己完成了一件事', '说了新词/新句子', '解锁新动作'],
   daily: ['今天发生的一件小事', '自己做了…', '出门玩了', '和家人在一起'],
   emotion: ['特别开心', '有点害羞', '很黏人', '突然不高兴', '情绪来得很快'],
-  sleep: ['早醒', '入睡困难', '夜醒', '午睡不好', '睡前折腾'],
-  diet: ['吃得好', '挑食/拒食', '要喝奶', '肚子不舒服', '零食相关'],
+  diet: [
+    '吃得好',
+    '挑食/拒食',
+    '要喝奶',
+    '肚子不舒服',
+    '零食相关',
+    '拉臭臭成功',
+    '试图拉但没成',
+    '拉在裤子上',
+    '不肯坐盆/马桶',
+    '早醒',
+    '入睡困难',
+    '夜醒',
+    '午睡不好/没午睡',
+    '睡前折腾',
+    '睡得香',
+  ],
   social: ['见人热情/认生', '分离焦虑', '和小朋友互动', '上幼儿园相关'],
   medical: ['发烧/看病', '疫苗', '吃药', '过敏/皮疹', '体检'],
+  highlight: [
+    '第一次做到了',
+    '特别暖心的瞬间',
+    '笑到停不下来',
+    '突然懂事了',
+    '令人骄傲的表现',
+    '玩得很投入',
+    '和家人甜蜜互动',
+    '今日最佳表情',
+    '小小成就感',
+    '意外惊喜',
+  ],
 }
 
 /** 崩溃应对方式 chips（事后补详情用） */
@@ -83,17 +110,13 @@ export const TRIGGER_CHIPS: { value: string; label: string }[] = [
 ]
 
 /** 地点枚举转中文 */
-export function locationLabel(value: string | null | undefined): string {
-  if (!value) {
-    return '—'
-  }
+export function locationLabel(value: string | null | undefined) {
+  if (!value) return '—'
   return LOCATION_LABELS[value] ?? value
 }
 
 /** 记录人枚举转中文 */
-export function caregiverLabel(value: string | null | undefined): string {
-  if (!value) {
-    return '—'
-  }
+export function caregiverLabel(value: string | null | undefined) {
+  if (!value) return '—'
   return CAREGIVER_LABELS[value] ?? value
 }

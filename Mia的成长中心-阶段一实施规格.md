@@ -2,7 +2,7 @@
 
 > 交付对象：Cursor。这份文档要能达到「照着做就能跑起来」的程度。  
 > 文件名仍带「阶段一」，但正文已覆盖阶段二/三落地结果；任务勾选以 `.cursor/rules/40|45|46|47|48` 为准。  
-> **修订（2026-09-01）**：事件类型拆分、场景卡 v3、分析砍照护人/按星期、AI 咨询历史、可选应用内登录等已与代码对齐。
+> **修订（2026-09-01）**：事件类型拆分、场景卡 v3、分析砍记录人/按星期、AI 咨询历史、可选应用内登录等已与代码对齐。
 
 ## 0. 目标与边界
 
@@ -283,13 +283,15 @@ Element Plus 用 CSS 变量，覆写即可全局生效：
 | `skill` 技能 | `#7FC8A9` 薄荷绿 | `#D6EFE3` | 🌱 |
 | `daily` 日常 | `#C4A574` 暖褐 | `#F3EADC` | 📒 |
 | `emotion` 情绪 | `#E8A87C` 杏橙 | `#F8E6D8` | 🫧 |
-| `sleep` 睡眠 | `#6BA3D6` 天空蓝 | `#DCEAF5` | 🌙（场景卡录入用 😴） |
-| `diet` 饮食 | `#D4896A` 陶土 | `#F5E0D6` | 🥣 |
+| `highlight` 高光时刻 | `#E8B84A` 蜜金 | `#FBF0D6` | ✨ |
+| `diet` 吃喝拉撒睡 | `#D4896A` 陶土 | `#F5E0D6` | 🥣 |
 | `social` 社交 | `#7EB8B2` 青绿 | `#DCEEED` | 👋 |
 | `medical` 医疗 | `#6B8FD6` 雾蓝 | `#DDE6F5` | 💊 |
 | `quote` 语录 | `#A98BC4` 葡萄紫 | `#EDE5F3` | 💬 |
 
-> **Legacy（仅兼容旧数据展示，不可新建）**：`health`（健康）、`question`（想问）。  
+历史只读（不可新建）：`sleep` 睡眠、`health` 健康、`question` 想问。
+
+> **Legacy（仅兼容旧数据展示，不可新建）**：`sleep` / `health` / `question`。  
 > **用 emoji 而不是 Element Plus 的线性图标。** Element Plus 图标是细描边线性风格，偏商务；emoji 饱满有笔触感，跟糖果风一致，且零成本。
 
 ### 组件级要求
@@ -449,7 +451,7 @@ mia-center/                     # 仓库根
 CREATE TABLE events (
   id            TEXT PRIMARY KEY,      -- uuid，客户端生成（离线也要能建）
   happened_at   TEXT NOT NULL,         -- ISO 字符串，事件发生时间
-  type          TEXT NOT NULL,         -- meltdown | skill | daily | emotion | sleep | diet | social | medical
+  type          TEXT NOT NULL,         -- meltdown | skill | daily | emotion | diet | social | medical | highlight（历史：sleep|health|question）
                                        -- 历史兼容：health | question（不可新建）；语录见 quotes 表
   summary       TEXT,                  -- 一句话（chips 选的或手输）
   chips         TEXT,                  -- JSON 数组，存原始 chip 值
@@ -592,20 +594,20 @@ export interface Scene {
 
 /** 本地持久化键：mia-scenes-v3（崩溃收成单卡） */
 export const DEFAULT_SCENES: Scene[] = [
-  { id: 'meltdown',  label: '崩溃',     icon: '🍭', preset: { type: 'meltdown' }, order: 1, count: 0 },
-  { id: 'new-skill', label: '新技能',   icon: '🌱', preset: { type: 'skill' },    order: 2, count: 0 },
-  { id: 'daily',     label: '日常点滴', icon: '📒', preset: { type: 'daily' },    order: 3, count: 0 },
-  { id: 'emotion',   label: '情绪观察', icon: '🫧', preset: { type: 'emotion' },  order: 4, count: 0 },
-  { id: 'sleep',     label: '睡眠',     icon: '😴', preset: { type: 'sleep' },    order: 5, count: 0 },
-  { id: 'diet',      label: '饮食',     icon: '🥣', preset: { type: 'diet' },     order: 6, count: 0 },
-  { id: 'social',    label: '社交分离', icon: '👋', preset: { type: 'social' },   order: 7, count: 0 },
-  { id: 'medical',   label: '医疗',     icon: '💊', preset: { type: 'medical' },  order: 8, count: 0 },
+  { id: 'meltdown',  label: '崩溃',       icon: '🍭', preset: { type: 'meltdown' },  order: 1, count: 0 },
+  { id: 'highlight', label: '高光时刻',   icon: '✨', preset: { type: 'highlight' }, order: 2, count: 0 },
+  { id: 'new-skill', label: '新技能',     icon: '🌱', preset: { type: 'skill' },     order: 3, count: 0 },
+  { id: 'daily',     label: '日常点滴',   icon: '📒', preset: { type: 'daily' },     order: 4, count: 0 },
+  { id: 'emotion',   label: '情绪观察',   icon: '🫧', preset: { type: 'emotion' },   order: 5, count: 0 },
+  { id: 'diet',      label: '吃喝拉撒睡', icon: '🥣', preset: { type: 'diet' },      order: 6, count: 0 },
+  { id: 'social',    label: '社交分离',   icon: '👋', preset: { type: 'social' },    order: 7, count: 0 },
+  { id: 'medical',   label: '医疗',       icon: '💊', preset: { type: 'medical' },   order: 8, count: 0 },
 ]
 ```
 
 > ⚠️ **卡片必须可增删、可改预填内容、可拖拽排序。** 8 张是类型入口，细节靠 chips，是起点不是定论。  
 > 排序：有用户拖拽顺序则优先；否则按使用 `count` 降序。  
-> 自定义场景可调 `POST /api/ai/scene-suggest` 预览 emoji（不写库）。
+> 自定义场景可调 `POST /api/ai/scene-suggest` 预览 emoji + 事件类型（不写库；类型可手改）。
 
 **语录不进场景卡** —— 走独立渺言妙语模块（4.6 节）。  
 `trigger` 已含 `bedtime`（睡前）。
@@ -625,8 +627,16 @@ export const CHIPS_BY_TYPE: Record<EventType, string[]> = {
   skill:   ['自己完成了一件事', '说了新词/新句子', '解锁新动作'],
   daily:   ['今天发生的一件小事', '自己做了…', '出门玩了', '和家人在一起'],
   emotion: ['特别开心', '有点害羞', '很黏人', '突然不高兴', '情绪来得很快'],
-  sleep:   ['早醒', '入睡困难', '夜醒', '午睡不好', '睡前折腾'],
-  diet:    ['吃得好', '挑食/拒食', '要喝奶', '肚子不舒服', '零食相关'],
+  highlight: [
+    '第一次做到了', '特别暖心的瞬间', '笑到停不下来', '突然懂事了',
+    '令人骄傲的表现', '玩得很投入', '和家人甜蜜互动', '今日最佳表情',
+    '小小成就感', '意外惊喜',
+  ],
+  diet: [
+    '吃得好', '挑食/拒食', '要喝奶', '肚子不舒服', '零食相关',
+    '拉臭臭成功', '试图拉但没成', '拉在裤子上', '不肯坐盆/马桶',
+    '早醒', '入睡困难', '夜醒', '午睡不好/没午睡', '睡前折腾', '睡得香',
+  ],
   social:  ['见人热情/认生', '分离焦虑', '和小朋友互动', '上幼儿园相关'],
   medical: ['发烧/看病', '疫苗', '吃药', '过敏/皮疹', '体检'],
 }
@@ -882,7 +892,7 @@ CREATE INDEX idx_quotes_month ON quotes(month_age DESC, said_at DESC);
 | 要点  | 做法                                   |
 | --- | ------------------------------------ |
 | 分页  | 每次加载 50 条，滚动到底自动加载（先不做虚拟滚动，几千条内没必要）  |
-| 筛选  | 顶部按类型：全部 / 崩溃 / 语录 / 技能 / 日常 / 情绪 / 睡眠 / 饮食 / 社交 / 医疗 |
+| 筛选  | 顶部按类型：全部 / 崩溃 / 语录 / 高光 / 技能 / 日常 / 情绪 / 吃喝拉撒睡 / 社交 / 医疗 |
 | 补录  | 顶部「补录」或快捷键 `B`，默认时间可改（补昨天的事是高频场景）          |
 | 编辑  | 点条目 → 右侧抽屉，可改可删可补详情                  |
 | 空状态 | 没记录时引导去录入，别显示一片空白                    |
@@ -924,15 +934,15 @@ CREATE INDEX idx_quotes_month ON quotes(month_age DESC, said_at DESC);
 | 类型 | 主色 | 浅底 | 图标 |
 | --- | --- | --- | -- |
 | `meltdown` 崩溃 | `#E8736B` | `#FADBD8` | 🍭 |
+| `highlight` 高光 | `#E8B84A` | `#FBF0D6` | ✨ |
 | `skill` 技能 | `#7FC8A9` | `#D6EFE3` | 🌱 |
 | `daily` 日常 | `#C4A574` | `#F3EADC` | 📒 |
 | `emotion` 情绪 | `#E8A87C` | `#F8E6D8` | 🫧 |
-| `sleep` 睡眠 | `#6BA3D6` | `#DCEAF5` | 🌙 |
-| `diet` 饮食 | `#D4896A` | `#F5E0D6` | 🥣 |
+| `diet` 吃喝拉撒睡 | `#D4896A` | `#F5E0D6` | 🥣 |
 | `social` 社交 | `#7EB8B2` | `#DCEEED` | 👋 |
 | `medical` 医疗 | `#6B8FD6` | `#DDE6F5` | 💊 |
 | **quote 语录** | `#A98BC4` | `#EDE5F3` | 💬 |
-| Legacy `health` / `question` | 仅展示兼容 | | 🌙 / ❓ |
+| Legacy `sleep` / `health` / `question` | 仅展示兼容 | | 🌙 / 🌙 / ❓ |
 
 **不要用 `<el-tag type="danger">` 这类默认标签**——方角 + 无描边，跟糖果风冲突。自己写一个 `<TypeChip>`：
 
@@ -1012,7 +1022,7 @@ GET    /api/ai/chats/:id
 DELETE /api/ai/chats/:id
 POST   /api/ai/insight        分析页一键解读（默认不入库）
 POST   /api/ai/skill-suggest  { label } → 预览 emoji/领域（不写库）
-POST   /api/ai/scene-suggest  { label } → 预览 emoji（不写库）
+POST   /api/ai/scene-suggest  { label } → 预览 emoji + type（不写库）
 
 # 可选应用内登录（未配 MIA_AUTH_* 则关闭）
 GET    /api/auth/status
@@ -1714,7 +1724,7 @@ src/assets/sprite/
 | **Service Worker 缓存**      | 更新后可能看到旧页面，`registerType: 'autoUpdate'` + 提示刷新                                       |
 | **POST 幂等**                | 离线重放必然遇到，一定要 `INSERT OR IGNORE`                                                      |
 | **空 DELETE 别带 JSON Content-Type** | Fastify 会因空 body 报 400；`client.ts` 仅在有 body 时设置该头 |
-| **分析别加回照护人/按星期** | 已有意从 analytics 去掉，勿再加 |
+| **分析别加回记录人/按星期** | 已有意从 analytics 去掉，勿再加 |
 | **⭐ 别长成后台管理系统**            | Element Plus 默认是后台风（方角、灰描边、商务蓝）。**必须按 1.2 节做可爱化改造**，并在 T1.5 一次性建好 token，不然后面每个页面都要返工 |
 | **别用 `<el-tag>`**          | 方角 + 无描边，跟糖果风冲突。自己写 `<TypeChip>`（胶囊形 + 2px 描边）                                       |
 | **图标用 emoji**              | Element Plus 图标是细描边线性风格，偏商务。emoji 饱满有笔触感且零成本                                          |

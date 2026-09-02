@@ -90,7 +90,7 @@ export class AiController {
   }
 
   /**
-   * 场景名称预览 emoji（不写库）
+   * 自定义场景：预览 emoji + 新类型 + 5 条 chips（不写库）
    * POST /api/ai/scene-suggest
    */
   @Post('scene-suggest')

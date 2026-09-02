@@ -14,7 +14,7 @@ alwaysApply: false
 - [x] **P2-AI** 分析页「生成解读」（`POST /api/ai/insight` + Mia 档案；不写回 events）
 - [ ] **P2-5** 用真实崩溃记录替换/删掉种子数据后复验
 
-**有意砍掉（勿再加回）：** 按星期排行、在场照护人排行（`byWeekday` / `byCaregiver`）。
+**有意砍掉（勿再加回）：** 按星期排行、记录人排行（`byWeekday` / `byCaregiver`）。
 
 地点标签含：家里 / 户外 / 商场 / 爷奶家 / 桃树地 / 彤彤姐家 / 学校 / 其他。
 

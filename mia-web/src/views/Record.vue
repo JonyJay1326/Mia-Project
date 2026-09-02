@@ -16,7 +16,6 @@ import {
 import type {
   CaregiverType,
   EventRecord,
-  EventType,
   LocationType,
   TriggerType,
 } from '@/types/event'
@@ -54,7 +53,7 @@ const isBackfill = computed(() => route.query.backfill === '1')
 
 const form = reactive({
   happenedLocal: toDatetimeLocalValue(),
-  type: 'meltdown' as EventType,
+  type: 'meltdown' as string,
   summary: '',
   chips: [] as string[],
   location: prefs.location as LocationType | null,
@@ -81,6 +80,14 @@ const isMeltdown = computed(() => form.type === 'meltdown')
 
 /** 是否技能类（保存后同步进技能地图） */
 const isSkill = computed(() => form.type === 'skill')
+
+/** 当前场景自带的一句话 chips（自定义卡） */
+const activeSceneChips = computed(() => {
+  if (!activeSceneId.value) {
+    return null
+  }
+  return sceneCardsRef.value?.getScene(activeSceneId.value)?.chips ?? null
+})
 
 /** 拉取最近几条，给手机首页预览 */
 async function loadRecent() {
@@ -231,7 +238,7 @@ async function submit() {
     coping: form.coping,
     outcome: form.outcome || null,
     caregiver: form.caregiver,
-    napped: form.napped,
+    napped: isSkill.value ? null : form.napped,
     photoId: form.photoId,
     monthAge: monthAge(BIRTH_DATE, happenedAt),
   }
@@ -356,6 +363,7 @@ onUnmounted(() => {
         <ChipGroup
           v-model="form.chips"
           :type="form.type"
+          :options="activeSceneChips"
           @pick="onPickSummary"
         />
         <input
@@ -414,7 +422,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="form__block">
+      <div v-if="!isSkill" class="form__block">
         <h3 class="form__label">今天午睡了吗</h3>
         <div class="form__chips">
           <button

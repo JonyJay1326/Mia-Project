@@ -19,7 +19,7 @@ alwaysApply: false
 - `GET /api/ai/chats`、`GET /api/ai/chats/:id`、`DELETE /api/ai/chats/:id`
 - `POST /api/ai/insight` `{ days? }`
 - `POST /api/ai/skill-suggest` `{ label }` → 预览领域/emoji（不写库）
-- `POST /api/ai/scene-suggest` `{ label }` → 预览 emoji（不写库）
+- `POST /api/ai/scene-suggest` `{ label }` → 预览 emoji + type（不写库）
 
 ## 页面
 

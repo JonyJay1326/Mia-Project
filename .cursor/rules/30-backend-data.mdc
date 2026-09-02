@@ -19,7 +19,8 @@ alwaysApply: false
 | `skill_marks` | 掌握标记（无行 = todo） |
 | `ai_chats` | AI 咨询会话（messages JSON） |
 
-**`events.type`：** `meltdown | skill | daily | emotion | sleep | diet | social | medical`  
+**`events.type`：** `meltdown | skill | daily | emotion | diet | social | medical | highlight`  
+（历史只读：`sleep | health | question`）  
 Legacy 只读：`health | question`。
 
 **地点：** `home | outdoor | mall | grandparents | taoshudi | tongtong | school | other`  

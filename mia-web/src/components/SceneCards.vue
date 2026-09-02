@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { suggestSceneEmoji } from '@/api/ai'
 import { useMiaConfirm } from '@/composables/useMiaConfirm'
+import { upsertCustomType } from '@/config/customTypes'
 import type { Scene } from '@/config/scenes'
 import {
   DEFAULT_SCENES,
@@ -40,7 +41,13 @@ const displayScenes = computed(() =>
 const draftLabel = ref('')
 /** AI 预览 emoji */
 const previewEmoji = ref('⭐')
-/** 正在识别 emoji */
+/** AI 预览类型中文名 */
+const previewTypeLabel = ref('')
+/** AI 预览类型 key（未加 c_ 前缀） */
+const previewTypeKey = ref('')
+/** AI 预览 chips */
+const previewChips = ref<string[]>([])
+/** 正在识别 */
 const emojiSuggesting = ref(false)
 /** 正在添加场景 */
 const adding = ref(false)
@@ -87,13 +94,14 @@ function onDrop(index: number) {
   dragFrom.value = null
 }
 
-/** 删除场景卡片（二次确认） */
+/** 删除自定义场景卡片（默认卡不可删） */
 async function requestRemoveScene(scene: Scene) {
+  if (!scene.custom) {
+    return
+  }
   const ok = await confirm({
     title: '删除这张场景卡片？',
-    message: scene.custom
-      ? `删除后不可恢复。\n\n${scene.icon} ${scene.label}`
-      : `这是内置场景，删除后可通过「恢复默认」找回。\n\n${scene.icon} ${scene.label}`,
+    message: `删除后不可恢复。\n\n${scene.icon} ${scene.label}`,
     confirmText: '删除',
     cancelText: '再想想',
     danger: true,
@@ -114,50 +122,70 @@ function removeScene(id: string) {
   persist()
 }
 
+/** 清空预览 */
+function clearPreview() {
+  previewEmoji.value = '⭐'
+  previewTypeLabel.value = ''
+  previewTypeKey.value = ''
+  previewChips.value = []
+  lastPreviewKey.value = ''
+}
+
 /**
- * 输入变化时 debounce 调用 AI 预览 emoji
+ * 输入变化时 debounce 调用 AI 预览
  */
 watch(draftLabel, (text) => {
   window.clearTimeout(suggestTimer)
   const trimmed = text.trim()
   if (!trimmed) {
-    previewEmoji.value = '⭐'
-    lastPreviewKey.value = ''
+    clearPreview()
     return
   }
   suggestTimer = window.setTimeout(() => {
-    void refreshEmojiPreview(trimmed)
+    void refreshSuggestPreview(trimmed)
   }, 450)
 })
 
-/** 刷新 AI emoji 预览 */
-async function refreshEmojiPreview(label: string) {
+/** 刷新 AI 预览（emoji + 新类型 + chips） */
+async function refreshSuggestPreview(label: string) {
   emojiSuggesting.value = true
   try {
     const meta = await suggestSceneEmoji(label)
-    previewEmoji.value = meta.emoji
+    applySuggest(meta)
     lastPreviewKey.value = label
   } catch {
-    previewEmoji.value = '⭐'
-    lastPreviewKey.value = ''
+    clearPreview()
   } finally {
     emojiSuggesting.value = false
   }
 }
 
+/** 写入预览状态 */
+function applySuggest(meta: {
+  emoji: string
+  typeKey: string
+  typeLabel: string
+  chips: string[]
+}) {
+  previewEmoji.value = meta.emoji || '⭐'
+  previewTypeKey.value = meta.typeKey || ''
+  previewTypeLabel.value = meta.typeLabel || ''
+  previewChips.value = (meta.chips ?? []).slice(0, 5)
+}
+
 /**
- * 解析最终 emoji：优先用已预览结果，否则即时请求
+ * 解析最终建议：优先用已预览结果
  */
-async function resolveEmoji(label: string): Promise<string> {
-  if (lastPreviewKey.value === label && previewEmoji.value) {
-    return previewEmoji.value
+async function resolveSuggest(label: string) {
+  if (lastPreviewKey.value === label && previewTypeKey.value) {
+    return {
+      emoji: previewEmoji.value,
+      typeKey: previewTypeKey.value,
+      typeLabel: previewTypeLabel.value,
+      chips: previewChips.value,
+    }
   }
-  try {
-    const meta = await suggestSceneEmoji(label)
-    return meta.emoji
-  } catch {
-    return '⭐'
-  }
+  return suggestSceneEmoji(label)
 }
 
 /** 新增一张自定义场景卡片 */
@@ -168,24 +196,40 @@ async function addScene() {
   }
   adding.value = true
   try {
-    const icon = await resolveEmoji(label)
+    const meta = await resolveSuggest(label)
+    const typeKey = `c_${meta.typeKey || createId().slice(0, 8)}`
+    const typeLabel = meta.typeLabel?.trim() || label.slice(0, 8)
+    const chips = (meta.chips ?? [])
+      .map((c) => c.trim())
+      .filter(Boolean)
+      .slice(0, 5)
+    const emoji = meta.emoji || '⭐'
     const id = `custom-${createId().slice(0, 8)}`
+
+    upsertCustomType({
+      key: typeKey,
+      label: typeLabel,
+      icon: emoji,
+      chips,
+    })
+
     const scene: Scene = {
       id,
       label,
-      icon,
-      preset: { type: 'daily' },
+      icon: emoji,
+      preset: { type: typeKey },
       order: scenes.value.length + 1,
       count: 0,
       custom: true,
+      typeLabel,
+      chips,
     }
     scenes.value = [...scenes.value, scene]
     if (orderIds.value) {
       orderIds.value = [...orderIds.value, id]
     }
     draftLabel.value = ''
-    previewEmoji.value = '⭐'
-    lastPreviewKey.value = ''
+    clearPreview()
     persist()
   } finally {
     adding.value = false
@@ -200,14 +244,20 @@ function bumpCount(id: string) {
   persist()
 }
 
-/** 恢复默认 8 张 */
+/** 按 id 取场景（录入页取 chips） */
+function getScene(id: string): Scene | undefined {
+  return scenes.value.find((s) => s.id === id)
+}
+
+/** 恢复默认 8 张（保留自定义卡） */
 function resetDefaults() {
-  scenes.value = structuredClone(DEFAULT_SCENES)
+  const custom = scenes.value.filter((s) => s.custom)
+  scenes.value = [...structuredClone(DEFAULT_SCENES), ...custom]
   orderIds.value = null
   persist()
 }
 
-defineExpose({ bumpCount })
+defineExpose({ bumpCount, getScene })
 </script>
 
 <template>
@@ -235,6 +285,7 @@ defineExpose({ bumpCount })
         :class="{
           'is-active': props.activeId === scene.id,
           'scene-card--editing': editing,
+          'scene-card--can-remove': editing && scene.custom,
         }"
         :draggable="editing"
         @click="onSelect(scene)"
@@ -246,7 +297,7 @@ defineExpose({ bumpCount })
         <span class="scene-card__label">{{ scene.label }}</span>
         <span v-if="scene.count > 0" class="scene-card__count">{{ scene.count }}</span>
         <button
-          v-if="editing"
+          v-if="editing && scene.custom"
           type="button"
           class="scene-card__remove"
           aria-label="删除"
@@ -277,7 +328,7 @@ defineExpose({ bumpCount })
       <input
         v-model="draftLabel"
         class="mia-input scene-cards__label-input"
-        placeholder="新场景名称"
+        placeholder="新场景名称，如：拉臭臭"
         :disabled="adding"
         @keydown.enter="addScene"
       />
@@ -289,9 +340,25 @@ defineExpose({ bumpCount })
       >
         {{ adding ? '添加中…' : '添加' }}
       </button>
+      <div v-if="draftLabel.trim()" class="scene-cards__suggest">
+        <p class="scene-cards__suggest-type">
+          <template v-if="emojiSuggesting">识别类型中…</template>
+          <template v-else-if="previewTypeLabel">
+            新类型：<strong>{{ previewTypeLabel }}</strong>
+          </template>
+          <template v-else>输入后自动生成类型与一句话</template>
+        </p>
+        <div v-if="previewChips.length" class="scene-cards__suggest-chips">
+          <span
+            v-for="chip in previewChips"
+            :key="chip"
+            class="mia-chip scene-cards__suggest-chip"
+          >{{ chip }}</span>
+        </div>
+      </div>
     </div>
     <p v-if="editing" class="scene-cards__hint">
-      emoji 由 AI 自动选择，无法手动修改
+      AI 会生成专属分类名和 5 条一句话；时间线筛选归入「其他」
     </p>
   </div>
 </template>
@@ -361,8 +428,8 @@ defineExpose({ bumpCount })
     right var(--dur) var(--ease-soft);
 }
 
-/** 编辑态：计数角标让位给右上角删除钮 */
-.scene-card--editing .scene-card__count {
+/** 编辑态且可删：计数角标让位给右上角删除钮 */
+.scene-card--can-remove .scene-card__count {
   right: auto;
   left: 8px;
 }
@@ -446,6 +513,31 @@ defineExpose({ bumpCount })
 .scene-cards__label-input {
   flex: 1 1 160px;
   min-width: 0;
+}
+
+.scene-cards__suggest {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scene-cards__suggest-type {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--c-ink-2);
+}
+
+.scene-cards__suggest-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scene-cards__suggest-chip {
+  cursor: default;
+  opacity: 0.92;
+  pointer-events: none;
 }
 
 .scene-cards__hint {

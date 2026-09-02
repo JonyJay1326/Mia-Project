@@ -82,9 +82,14 @@ export function postAiInsight(days = 60) {
   })
 }
 
-/** AI 预览场景 emoji（不写库） */
+/** AI 预览自定义场景：emoji + 新类型 + 5 条 chips（不写库） */
 export function suggestSceneEmoji(label: string) {
-  return request<{ emoji: string }>('/ai/scene-suggest', {
+  return request<{
+    emoji: string
+    typeKey: string
+    typeLabel: string
+    chips: string[]
+  }>('/ai/scene-suggest', {
     method: 'POST',
     body: JSON.stringify({ label }),
   })

@@ -546,7 +546,7 @@ onMounted(() => {
 
 .skill {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 40px 1fr auto;
   grid-template-rows: auto auto;
   column-gap: 10px;
   row-gap: 4px;
@@ -596,8 +596,14 @@ onMounted(() => {
 
 .skill__emoji {
   grid-row: 1 / span 2;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 28px;
   line-height: 1;
+  overflow: hidden;
 }
 
 .skill__label {

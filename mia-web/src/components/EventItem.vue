@@ -68,7 +68,7 @@ function labelOf(
     </p>
 
     <p v-if="item.event" class="event-item__sub desktop-only">
-      照护：{{ caregiverLabel(item.event.caregiver) }}
+      记录人：{{ caregiverLabel(item.event.caregiver) }}
       · 地点：{{ locationLabel(item.event.location) }}
       <template v-if="item.event.trigger">
         · 触发：{{ labelOf(TRIGGER_CHIPS, item.event.trigger) }}

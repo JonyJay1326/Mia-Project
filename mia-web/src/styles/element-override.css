@@ -56,10 +56,18 @@
   box-shadow: 2.5px 2.5px 0 #e0cdb8 !important;
   background: #fffdf8 !important;
   border-radius: 12px !important;
-  padding: 4px 12px;
+  padding: 6px 12px;
   transition:
     transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
     box-shadow 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mia-datetime .el-input__inner,
+.mia-datetime .el-input__wrapper input {
+  font-size: var(--fs-base) !important;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #4a3f38;
 }
 
 .mia-datetime .el-input__wrapper:hover {
@@ -139,7 +147,7 @@
 .mia-datetime-popper .el-date-picker__header-label {
   color: #4a3f38;
   font-weight: 700;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-base);
   line-height: 1.4;
   white-space: nowrap;
 }
@@ -164,6 +172,7 @@
   color: #96867a;
   border-bottom: 1px solid #e0cdb8;
   font-weight: 600;
+  font-size: var(--fs-sm);
   text-align: center;
   padding: 6px 0;
 }
@@ -176,7 +185,7 @@
 }
 
 .mia-datetime-popper .el-date-table td .el-date-table-cell {
-  height: 36px;
+  height: 40px;
   padding: 0;
   box-sizing: border-box;
   display: flex;
@@ -185,11 +194,12 @@
 }
 
 .mia-datetime-popper .el-date-table td .el-date-table-cell__text {
-  width: 28px;
-  height: 28px;
-  line-height: 28px;
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
   margin: 0;
   border-radius: 999px;
+  font-size: var(--fs-base);
   font-weight: 600;
   box-sizing: border-box;
   border: none;
@@ -320,10 +330,11 @@
 }
 
 .mia-time-popper .el-time-spinner__item {
-  height: 32px;
-  line-height: 32px;
+  height: 36px;
+  line-height: 36px;
   text-align: center;
   color: #4a3f38;
+  font-size: var(--fs-base);
   font-weight: 600;
 }
 

@@ -95,10 +95,10 @@ void props.placeholder
 }
 
 .mia-datetime-pair :deep(.mia-datetime--date) {
-  width: 148px;
+  width: 158px;
 }
 
 .mia-datetime-pair :deep(.mia-datetime--time) {
-  width: 110px;
+  width: 118px;
 }
 </style>

@@ -2,12 +2,15 @@
 import { computed, watch } from 'vue'
 import type { EventType } from '@/types/event'
 import { CHIPS_BY_TYPE } from '@/config/chips'
+import { getCustomType } from '@/config/customTypes'
 
 const props = defineProps<{
   /** 当前事件类型，决定 chips 列表 */
-  type: EventType
+  type: string
   /** 已选中的 chip 文案 */
   modelValue: string[]
+  /** 场景自带 chips（自定义卡优先） */
+  options?: string[] | null
   /** 是否允许多选，默认单选后写入 summary */
   multiple?: boolean
 }>()
@@ -18,8 +21,17 @@ const emit = defineEmits<{
   pick: [summary: string]
 }>()
 
-/** 当前类型可用 chips */
-const options = computed(() => CHIPS_BY_TYPE[props.type] ?? [])
+/** 当前可用 chips：场景覆盖 > 自定义类型 > 内置表 */
+const chipOptions = computed(() => {
+  if (props.options?.length) {
+    return props.options
+  }
+  const custom = getCustomType(props.type)
+  if (custom?.chips?.length) {
+    return custom.chips
+  }
+  return CHIPS_BY_TYPE[props.type as EventType] ?? []
+})
 
 /**
  * 点击 chip：单选替换；多选切换
@@ -52,9 +64,9 @@ watch(
 </script>
 
 <template>
-  <div v-if="options.length" class="chip-group">
+  <div v-if="chipOptions.length" class="chip-group">
     <button
-      v-for="label in options"
+      v-for="label in chipOptions"
       :key="label"
       type="button"
       class="mia-chip"

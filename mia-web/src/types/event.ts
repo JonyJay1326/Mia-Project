@@ -4,16 +4,19 @@ export type EventType =
   | 'skill'
   | 'daily'
   | 'emotion'
-  | 'sleep'
   | 'diet'
   | 'social'
   | 'medical'
+  | 'highlight'
 
 /** 历史类型（仅兼容已有数据展示，不可新建） */
-export type LegacyEventType = 'health' | 'question'
+export type LegacyEventType = 'health' | 'question' | 'sleep'
 
-/** 时间线展示用类型（含语录与历史类型） */
-export type TimelineItemType = EventType | LegacyEventType | 'quote'
+/** 任意事件类型：内置 + 历史 + AI 自定义 key（如 c_toilet） */
+export type AnyEventType = EventType | LegacyEventType | (string & {})
+
+/** 时间线展示用类型（含语录与历史 / 自定义） */
+export type TimelineItemType = AnyEventType | 'quote'
 
 /** 地点 */
 export type LocationType =
@@ -37,14 +40,14 @@ export type TriggerType =
   | 'bedtime'
   | 'unknown'
 
-/** 照护人（录入仅用爸妈；爷奶仅兼容旧数据） */
+/** 记录人（录入仅用爸妈；爷奶仅兼容旧数据） */
 export type CaregiverType = 'mom' | 'dad' | 'grandma' | 'grandpa'
 
 /** 事件草稿 / 实体 */
 export interface EventRecord {
   id: string
   happenedAt: string
-  type: EventType | LegacyEventType
+  type: AnyEventType
   summary: string
   chips?: string[]
   location?: LocationType | null

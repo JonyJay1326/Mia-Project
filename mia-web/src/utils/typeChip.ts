@@ -1,4 +1,5 @@
 import type { TimelineItemType } from '@/types/event'
+import { getCustomType } from '@/config/customTypes'
 
 /** 类型胶囊的视觉配置 */
 export interface TypeChipStyle {
@@ -9,7 +10,7 @@ export interface TypeChipStyle {
 }
 
 /** 各类型对应的标签、emoji、配色 */
-export const TYPE_CHIP_MAP: Record<TimelineItemType, TypeChipStyle> = {
+export const TYPE_CHIP_MAP: Record<string, TypeChipStyle> = {
   meltdown: {
     label: '崩溃',
     icon: '🍭',
@@ -34,14 +35,8 @@ export const TYPE_CHIP_MAP: Record<TimelineItemType, TypeChipStyle> = {
     color: '#e8a87c',
     bg: '#f8e6d8',
   },
-  sleep: {
-    label: '睡眠',
-    icon: '🌙',
-    color: '#6ba3d6',
-    bg: '#dceaf5',
-  },
   diet: {
-    label: '饮食',
+    label: '吃喝拉撒睡',
     icon: '🥣',
     color: '#d4896a',
     bg: '#f5e0d6',
@@ -58,6 +53,12 @@ export const TYPE_CHIP_MAP: Record<TimelineItemType, TypeChipStyle> = {
     color: '#6b8fd6',
     bg: '#dde6f5',
   },
+  highlight: {
+    label: '高光',
+    icon: '✨',
+    color: '#e8b84a',
+    bg: '#fbf0d6',
+  },
   quote: {
     label: '语录',
     icon: '💬',
@@ -65,6 +66,12 @@ export const TYPE_CHIP_MAP: Record<TimelineItemType, TypeChipStyle> = {
     bg: '#ede5f3',
   },
   // 历史数据兼容
+  sleep: {
+    label: '睡眠',
+    icon: '🌙',
+    color: '#6ba3d6',
+    bg: '#dceaf5',
+  },
   health: {
     label: '健康',
     icon: '🌙',
@@ -79,9 +86,31 @@ export const TYPE_CHIP_MAP: Record<TimelineItemType, TypeChipStyle> = {
   },
 }
 
+/** 自定义类型默认配色 */
+const CUSTOM_TYPE_STYLE = {
+  color: '#96867a',
+  bg: '#f3eadc',
+}
+
 /**
- * 按事件类型取胶囊样式，未知类型回退为日常
+ * 按事件类型取胶囊样式；自定义类型读本地元数据
  */
-export function getTypeChipStyle(type: TimelineItemType): TypeChipStyle {
-  return TYPE_CHIP_MAP[type] ?? TYPE_CHIP_MAP.daily
+export function getTypeChipStyle(type: TimelineItemType | string): TypeChipStyle {
+  const builtin = TYPE_CHIP_MAP[type]
+  if (builtin) {
+    return builtin
+  }
+  const custom = getCustomType(type)
+  if (custom) {
+    return {
+      label: custom.label,
+      icon: custom.icon,
+      ...CUSTOM_TYPE_STYLE,
+    }
+  }
+  return {
+    label: type.startsWith('c_') ? type.slice(2) : type,
+    icon: '⭐',
+    ...CUSTOM_TYPE_STYLE,
+  }
 }

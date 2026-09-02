@@ -18,22 +18,24 @@ import {
   type TimelineItem,
 } from '@/utils/timeline'
 import { TRIGGER_CHIPS, COPING_CHIPS, caregiverLabel, locationLabel } from '@/config/chips'
+import { isDefaultTimelineFilterType } from '@/config/eventTypes'
 import { useEventsStore } from '@/stores/events'
 import { useMiaConfirm } from '@/composables/useMiaConfirm'
 
-type FilterType = 'all' | TimelineItemType
+type FilterType = 'all' | 'other' | TimelineItemType
 
 const FILTERS: { value: FilterType; label: string }[] = [
   { value: 'all', label: '全部' },
   { value: 'meltdown', label: '崩溃' },
   { value: 'quote', label: '语录' },
+  { value: 'highlight', label: '高光' },
   { value: 'skill', label: '技能' },
   { value: 'daily', label: '日常' },
   { value: 'emotion', label: '情绪' },
-  { value: 'sleep', label: '睡眠' },
-  { value: 'diet', label: '饮食' },
+  { value: 'diet', label: '吃喝拉撒睡' },
   { value: 'social', label: '社交' },
   { value: 'medical', label: '医疗' },
+  { value: 'other', label: '其他' },
 ]
 
 const router = useRouter()
@@ -57,6 +59,9 @@ const removingId = ref<string | null>(null)
 const filtered = computed(() => {
   if (filter.value === 'all') {
     return items.value
+  }
+  if (filter.value === 'other') {
+    return items.value.filter((i) => !isDefaultTimelineFilterType(i.type))
   }
   return items.value.filter((i) => i.type === filter.value)
 })
@@ -450,7 +455,7 @@ onUnmounted(() => {
               · {{ formatMonthAge(selected.event.monthAge) }}
             </p>
             <ul class="drawer__facts">
-              <li>照护：{{ caregiverLabel(selected.event.caregiver) }}</li>
+              <li>记录人：{{ caregiverLabel(selected.event.caregiver) }}</li>
               <li>地点：{{ locationLabel(selected.event.location) }}</li>
               <li v-if="selected.event.trigger">
                 触发：{{ labelOf(TRIGGER_CHIPS, selected.event.trigger) }}
@@ -491,7 +496,11 @@ onUnmounted(() => {
 
           <template v-else>
             <label class="drawer__label">摘要</label>
-            <input v-model="editForm.summary" class="mia-input" type="text" />
+            <textarea
+              v-model="editForm.summary"
+              class="mia-input drawer__textarea"
+              rows="3"
+            />
             <template v-if="selected.event.type === 'meltdown'">
               <label class="drawer__label">强度</label>
               <div class="drawer__chips">
@@ -528,7 +537,12 @@ onUnmounted(() => {
               </div>
             </template>
             <label class="drawer__label">结果</label>
-            <input v-model="editForm.outcome" class="mia-input" type="text" />
+            <textarea
+              v-model="editForm.outcome"
+              class="mia-input drawer__textarea"
+              rows="3"
+              placeholder="后来怎样了"
+            />
             <EventMediaAttach v-model:photo-id="editForm.photoId" />
             <div class="drawer__actions">
               <button
@@ -783,6 +797,12 @@ onUnmounted(() => {
   font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--c-ink-2);
+}
+
+.drawer__textarea {
+  min-height: 4.8em;
+  resize: vertical;
+  line-height: 1.45;
 }
 
 .drawer__chips {

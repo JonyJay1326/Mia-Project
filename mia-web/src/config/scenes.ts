@@ -1,8 +1,9 @@
-import type { CaregiverType, EventType, LocationType, TriggerType } from '@/types/event'
+import type { CaregiverType, LocationType, TriggerType } from '@/types/event'
 
 /** 场景卡片预填字段 */
 export type ScenePreset = {
-  type: EventType
+  /** 内置 EventType 或自定义 key（c_xxx） */
+  type: string
   location?: LocationType
   trigger?: TriggerType
   caregiver?: CaregiverType
@@ -21,9 +22,13 @@ export interface Scene {
   count: number
   /** 是否用户自定义（可删除） */
   custom?: boolean
+  /** 自定义类型中文名（仅 custom） */
+  typeLabel?: string
+  /** 自定义场景专属 chips（仅 custom） */
+  chips?: string[]
 }
 
-/** 默认场景：崩溃一张总卡 + 各类型入口（细节靠 chips） */
+/** 默认场景：崩溃 + 高光 + 各类型入口（细节靠 chips） */
 export const DEFAULT_SCENES: Scene[] = [
   {
     id: 'meltdown',
@@ -34,11 +39,19 @@ export const DEFAULT_SCENES: Scene[] = [
     count: 0,
   },
   {
+    id: 'highlight',
+    label: '高光时刻',
+    icon: '✨',
+    preset: { type: 'highlight' },
+    order: 2,
+    count: 0,
+  },
+  {
     id: 'new-skill',
     label: '新技能',
     icon: '🌱',
     preset: { type: 'skill' },
-    order: 2,
+    order: 3,
     count: 0,
   },
   {
@@ -46,7 +59,7 @@ export const DEFAULT_SCENES: Scene[] = [
     label: '日常点滴',
     icon: '📒',
     preset: { type: 'daily' },
-    order: 3,
+    order: 4,
     count: 0,
   },
   {
@@ -54,20 +67,12 @@ export const DEFAULT_SCENES: Scene[] = [
     label: '情绪观察',
     icon: '🫧',
     preset: { type: 'emotion' },
-    order: 4,
-    count: 0,
-  },
-  {
-    id: 'sleep',
-    label: '睡眠',
-    icon: '😴',
-    preset: { type: 'sleep' },
     order: 5,
     count: 0,
   },
   {
     id: 'diet',
-    label: '饮食',
+    label: '吃喝拉撒睡',
     icon: '🥣',
     preset: { type: 'diet' },
     order: 6,
@@ -91,7 +96,7 @@ export const DEFAULT_SCENES: Scene[] = [
   },
 ]
 
-/** v3：崩溃收成单卡 */
+/** v3：崩溃收成单卡；加载时会同步内置卡名称并剔除已下线的 sleep */
 const STORAGE_KEY = 'mia-scenes-v3'
 
 /** 场景本地持久化结构 */
@@ -112,10 +117,47 @@ export function loadScenes(): Scene[] {
     if (!parsed.scenes?.length) {
       return structuredClone(DEFAULT_SCENES)
     }
-    return parsed.scenes
+    return syncBuiltinSceneMeta(parsed.scenes)
   } catch {
     return structuredClone(DEFAULT_SCENES)
   }
+}
+
+/**
+ * 内置场景以默认表为准：更新文案、补上新增卡、去掉已下线卡（如 sleep）
+ * 自定义卡保留
+ */
+function syncBuiltinSceneMeta(scenes: Scene[]): Scene[] {
+  const defaults = new Map(DEFAULT_SCENES.map((s) => [s.id, s]))
+  const custom = scenes.filter((s) => s.custom)
+  const syncedBuiltin: Scene[] = []
+  const seen = new Set<string>()
+
+  for (const scene of scenes) {
+    if (scene.custom) {
+      continue
+    }
+    const def = defaults.get(scene.id)
+    if (!def) {
+      continue
+    }
+    syncedBuiltin.push({
+      ...scene,
+      label: def.label,
+      icon: def.icon,
+      order: def.order,
+      preset: { ...def.preset, ...scene.preset, type: def.preset.type },
+    })
+    seen.add(scene.id)
+  }
+
+  for (const def of DEFAULT_SCENES) {
+    if (!seen.has(def.id)) {
+      syncedBuiltin.push(structuredClone(def))
+    }
+  }
+
+  return [...syncedBuiltin, ...custom]
 }
 
 /** 读取用户拖拽顺序 */
@@ -126,7 +168,15 @@ export function loadSceneOrderIds(): string[] | null {
       return null
     }
     const parsed = JSON.parse(raw) as ScenesStorage
-    return parsed.orderIds ?? null
+    const ids = parsed.orderIds ?? null
+    if (!ids) {
+      return null
+    }
+    const allowed = new Set([
+      ...DEFAULT_SCENES.map((s) => s.id),
+      ...(parsed.scenes ?? []).filter((s) => s.custom).map((s) => s.id),
+    ])
+    return ids.filter((id) => allowed.has(id))
   } catch {
     return null
   }
