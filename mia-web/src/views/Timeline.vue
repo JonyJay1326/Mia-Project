@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import EventItem from '@/components/EventItem.vue'
 import TypeChip from '@/components/TypeChip.vue'
 import EventMediaAttach from '@/components/EventMediaAttach.vue'
+import QuoteEditDialog from '@/components/QuoteEditDialog.vue'
 import { deleteEvent, deleteQuote, fetchEvents, fetchQuotesGrouped, patchEvent } from '@/api/events'
 import { photoAssetUrl } from '@/api/photos'
 import type { EventRecord, QuoteRecord, TimelineItemType } from '@/types/event'
@@ -16,7 +17,7 @@ import {
   monthKey,
   type TimelineItem,
 } from '@/utils/timeline'
-import { TRIGGER_CHIPS, caregiverLabel, locationLabel } from '@/config/chips'
+import { TRIGGER_CHIPS, COPING_CHIPS, caregiverLabel, locationLabel } from '@/config/chips'
 import { useEventsStore } from '@/stores/events'
 import { useMiaConfirm } from '@/composables/useMiaConfirm'
 
@@ -48,6 +49,7 @@ const filter = ref<FilterType>('all')
 const activeMonth = ref<string | null>(null)
 const drawerOpen = ref(false)
 const editing = ref(false)
+const quoteEditOpen = ref(false)
 const saving = ref(false)
 const removingId = ref<string | null>(null)
 
@@ -168,6 +170,7 @@ function openItem(item: TimelineItem) {
     editForm.value = {
       ...item.event,
       photoId: item.event.photoId ?? null,
+      coping: [...(item.event.coping ?? [])],
     }
   }
   drawerOpen.value = true
@@ -177,6 +180,7 @@ function openItem(item: TimelineItem) {
 function closeDrawer() {
   drawerOpen.value = false
   editing.value = false
+  quoteEditOpen.value = false
   eventsStore.selectEvent(null)
 }
 
@@ -199,6 +203,18 @@ function dayHeading(day: string) {
   const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
   const age = formatMonthAge(monthAge(BIRTH_DATE, d.toISOString()))
   return `${day}  周${week} · ${age}`
+}
+
+/** 编辑态切换应对方式多选 */
+function toggleEditCoping(label: string) {
+  const current = editForm.value.coping ?? []
+  const set = new Set(current)
+  if (set.has(label)) {
+    set.delete(label)
+  } else {
+    set.add(label)
+  }
+  editForm.value.coping = Array.from(set)
 }
 
 /** 保存事件补丁 */
@@ -257,6 +273,16 @@ async function removeSelected() {
     return
   }
   await removeItem(selected.value)
+}
+
+/** 语录编辑保存后更新本地列表 */
+function onQuoteSaved(updated: QuoteRecord) {
+  const idx = quoteRows.value.findIndex((q) => q.id === updated.id)
+  if (idx >= 0) {
+    quoteRows.value[idx] = updated
+  }
+  rebuildItems()
+  quoteEditOpen.value = false
 }
 
 /** Esc 关闭抽屉 */
@@ -405,6 +431,13 @@ onUnmounted(() => {
             我的感受：{{ selected.quote.note }}
           </p>
           <div class="drawer__actions">
+            <button
+              type="button"
+              class="mia-btn mia-btn--primary"
+              @click="quoteEditOpen = true"
+            >
+              编辑 / 补详情
+            </button>
             <button type="button" class="mia-btn" @click="removeSelected">删除</button>
           </div>
         </template>
@@ -480,6 +513,19 @@ onUnmounted(() => {
                 type="number"
                 min="0"
               />
+              <label class="drawer__label">应对方式</label>
+              <div class="drawer__chips">
+                <button
+                  v-for="label in COPING_CHIPS"
+                  :key="label"
+                  type="button"
+                  class="mia-chip"
+                  :class="{ 'is-active': (editForm.coping ?? []).includes(label) }"
+                  @click="toggleEditCoping(label)"
+                >
+                  {{ label }}
+                </button>
+              </div>
             </template>
             <label class="drawer__label">结果</label>
             <input v-model="editForm.outcome" class="mia-input" type="text" />
@@ -500,6 +546,12 @@ onUnmounted(() => {
       </aside>
     </div>
   </div>
+
+  <QuoteEditDialog
+    v-model:open="quoteEditOpen"
+    :quote="selected?.quote ?? null"
+    @saved="onQuoteSaved"
+  />
 </template>
 
 <style scoped>

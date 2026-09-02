@@ -49,6 +49,31 @@ export function fetchQuotesGrouped() {
   return request<QuoteMonthGroup[]>('/quotes')
 }
 
+/** 今日一句（不足 20 条时返回 null） */
+export function fetchDailyQuote() {
+  return request<QuoteRecord | null>('/quotes?daily=1')
+}
+
+/** 搜索语录 */
+export function searchQuotes(q: string) {
+  return request<QuoteRecord[]>(`/quotes?q=${encodeURIComponent(q)}`)
+}
+
+/** 更新语录（context / note / saidAt） */
+export function updateQuote(
+  id: string,
+  body: {
+    context?: string | null
+    note?: string | null
+    saidAt?: string
+  },
+) {
+  return request<QuoteRecord>(`/quotes/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
 /** 创建语录 */
 export function createQuote(body: unknown) {
   return request<QuoteRecord>('/quotes', {

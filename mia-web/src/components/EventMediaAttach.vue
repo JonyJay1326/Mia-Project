@@ -174,7 +174,8 @@ function clearAttach() {
 .media-attach {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  margin-top: 4px;
 }
 
 .media-attach__label-row {
@@ -185,14 +186,17 @@ function clearAttach() {
 }
 
 .media-attach__label {
+  margin: 0;
   font-size: var(--fs-sm);
-  font-weight: 800;
-  color: var(--c-ink);
+  font-weight: 700;
+  color: var(--c-ink-2);
 }
 
 .media-attach__hint {
   font-size: var(--fs-xs);
-  color: var(--c-ink-3);
+  font-weight: 600;
+  color: var(--c-ink-2);
+  opacity: 0.78;
 }
 
 .media-attach__pick {

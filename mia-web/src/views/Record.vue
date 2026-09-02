@@ -22,13 +22,15 @@ import type {
 } from '@/types/event'
 import {
   BIRTH_DATE,
+  formatMonthAge,
   fromDatetimeLocalValue,
   monthAge,
   toDatetimeLocalValue,
 } from '@/utils/date'
 import { loadLastPrefs, saveLastPrefs } from '@/utils/prefs'
 import { request } from '@/api/client'
-import { fetchEvents } from '@/api/events'
+import { fetchEvents, fetchDailyQuote } from '@/api/events'
+import type { QuoteRecord } from '@/types/event'
 import { createSkill } from '@/api/skills'
 import { skillDomainLabel } from '@/config/skillDomains'
 import { useDraftStore } from '@/stores/draft'
@@ -42,6 +44,7 @@ const showExtra = ref(false)
 const saving = ref(false)
 const toast = ref('')
 const recent = ref<EventRecord[]>([])
+const dailyQuote = ref<QuoteRecord | null>(null)
 const draftStore = useDraftStore()
 
 const prefs = loadLastPrefs()
@@ -85,6 +88,20 @@ async function loadRecent() {
   } catch {
     recent.value = []
   }
+}
+
+/** 拉取今日一句（不足 20 条时后端返回 null） */
+async function loadDailyQuote() {
+  try {
+    dailyQuote.value = await fetchDailyQuote()
+  } catch {
+    dailyQuote.value = null
+  }
+}
+
+/** 去语录墙 */
+function goQuotesWall() {
+  void router.push({ name: 'quotes' })
 }
 
 /**
@@ -269,6 +286,7 @@ function onSaveHotkey(e: KeyboardEvent) {
 
 onMounted(() => {
   void loadRecent()
+  void loadDailyQuote()
   window.addEventListener('keydown', onSaveHotkey)
 })
 
@@ -286,6 +304,19 @@ onUnmounted(() => {
         {{ isBackfill ? '改好时间再选场景保存' : '点一张场景卡片 → 选一句话 → 保存' }}
       </p>
     </header>
+
+    <button
+      v-if="dailyQuote && !activeSceneId"
+      type="button"
+      class="mia-card daily-quote"
+      @click="goQuotesWall"
+    >
+      <p class="daily-quote__eyebrow">
+        今日一句 · {{ formatMonthAge(dailyQuote.monthAge) }}
+      </p>
+      <p class="daily-quote__content">「{{ dailyQuote.content }}」</p>
+      <p v-if="dailyQuote.context" class="daily-quote__meta">{{ dailyQuote.context }}</p>
+    </button>
 
     <button
       v-if="!activeSceneId"
@@ -567,6 +598,49 @@ onUnmounted(() => {
 .quote-cta small {
   color: var(--c-ink-2);
   font-size: var(--fs-xs);
+}
+
+.daily-quote {
+  width: 100%;
+  display: block;
+  margin-bottom: 16px;
+  padding: 16px 18px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  background: var(--c-grape-soft);
+  border-color: var(--c-grape);
+  transition:
+    transform var(--dur) var(--ease-bounce),
+    box-shadow var(--dur) var(--ease-bounce);
+}
+
+.daily-quote:hover {
+  transform: translate(-1px, -2px);
+  box-shadow: var(--shadow-pop);
+}
+
+.daily-quote__eyebrow {
+  margin: 0 0 8px;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--c-grape);
+  letter-spacing: 0.02em;
+}
+
+.daily-quote__content {
+  margin: 0 0 6px;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--c-ink);
+  line-height: 1.45;
+}
+
+.daily-quote__meta {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--c-ink-2);
 }
 
 .mobile-only {

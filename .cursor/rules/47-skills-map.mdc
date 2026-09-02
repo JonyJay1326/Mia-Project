@@ -12,8 +12,8 @@ alwaysApply: false
 - [x] **SK-3** 档案 2026-08-30 已确认项幂等标为 done
 - [x] **SK-4** 前端 `/skills` + 侧边栏「技能」+ 快捷键 `S`
 - [x] **SK-5** `POST /api/ai/skill-suggest` 预览 emoji/领域（不写库）
-- [ ] **SK-6** 备注编辑 UI + 暴露备注接口（service `updateNote` 已有，路由未挂）
-- [ ] **SK-7** 删除自定义技能 UI + `DELETE /api/skills/:id`（service `removeCustom` 已有，路由未挂）
+- [x] **SK-6** 备注编辑 UI + 暴露备注接口（`PATCH /api/skills/:id/note`）
+- [x] **SK-7** 删除自定义技能 UI + `DELETE /api/skills/:id`
 
 `SkillItem` 含 `isCustom`；`mark` 可带 `note`，前端 cycle 暂未传。
 

@@ -17,6 +17,11 @@ export interface MarkSkillInput {
   note?: string | null
 }
 
+/** 更新备注请求 */
+export interface UpdateNoteInput {
+  note?: string | null
+}
+
 /** 新建自定义技能 */
 export interface CreateSkillInput {
   label: string

@@ -87,7 +87,8 @@ onUnmounted(() => {
 .mia-confirm-mask {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  /* 需高于 MiaFormDialog(120)、相册预览(130) 等，嵌套二次确认时才可见 */
+  z-index: 140;
   display: flex;
   align-items: center;
   justify-content: center;

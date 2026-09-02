@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { DbService } from '../db/db.service'
 import { PhotosService } from '../photos/photos.service'
 import type { QuoteInput, QuoteRecord, QuoteRow } from '../types/event'
-import { BIRTH_DATE, monthAge } from '../utils/date'
+import { BIRTH_DATE, chinaDayKey, monthAge } from '../utils/date'
 import { mapQuoteRow } from '../utils/mappers'
 
 /** 按月龄分组后的语录块 */
@@ -14,6 +14,9 @@ export interface QuoteMonthGroup {
 /** 语录表读写服务 */
 @Injectable()
 export class QuotesService {
+  /** 首页「今日一句」最少条数 */
+  static readonly MIN_FOR_DAILY = 20
+
   constructor(
     private readonly dbService: DbService,
     private readonly photosService: PhotosService,
@@ -80,6 +83,50 @@ export class QuotesService {
       .prepare('SELECT * FROM quotes ORDER BY RANDOM() LIMIT 1')
       .get() as QuoteRow | undefined
     return row ? mapQuoteRow(row) : null
+  }
+
+  /**
+   * 今日一句：条数 ≥20 时按东八区日期稳定选一条，同一天内不变
+   */
+  dailyOne(): QuoteRecord | null {
+    const count = this.count()
+    if (count < QuotesService.MIN_FOR_DAILY) {
+      return null
+    }
+
+    const rows = this.dbService.db
+      .prepare('SELECT * FROM quotes ORDER BY said_at ASC, id ASC')
+      .all() as QuoteRow[]
+
+    const dayKey = chinaDayKey()
+    let hash = 0
+    for (let i = 0; i < dayKey.length; i++) {
+      hash = (hash * 31 + dayKey.charCodeAt(i)) >>> 0
+    }
+    const index = hash % rows.length
+    return mapQuoteRow(rows[index])
+  }
+
+  /**
+   * 模糊搜索原话 / 上下文 / 感受
+   */
+  search(term: string): QuoteRecord[] {
+    const q = term.trim()
+    if (!q) {
+      return []
+    }
+    const safe = q.replace(/[%_]/g, '')
+    const like = `%${safe}%`
+    const rows = this.dbService.db
+      .prepare(
+        `SELECT * FROM quotes
+         WHERE content LIKE @like
+            OR context LIKE @like
+            OR note LIKE @like
+         ORDER BY said_at DESC`,
+      )
+      .all({ like }) as QuoteRow[]
+    return rows.map(mapQuoteRow)
   }
 
   /** 按主键查询 */

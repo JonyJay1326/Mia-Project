@@ -2,12 +2,22 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import MiaFormDialog from '@/components/MiaFormDialog.vue'
 import { formatFetchError } from '@/api/client'
-import { createSkill, fetchSkills, markSkill, suggestSkillMeta } from '@/api/skills'
+import {
+  createSkill,
+  deleteSkill,
+  fetchSkills,
+  markSkill,
+  suggestSkillMeta,
+  updateSkillNote,
+} from '@/api/skills'
 import {
   skillDomainLabel,
 } from '@/config/skillDomains'
 import type { SkillDomain, SkillDomainGroup, SkillItem, SkillStatus } from '@/types/skill'
+import { useMiaConfirm } from '@/composables/useMiaConfirm'
 import { formatMonthAge } from '@/utils/date'
+
+const { confirm } = useMiaConfirm()
 
 const loading = ref(false)
 const error = ref('')
@@ -24,6 +34,98 @@ const previewDomain = ref<SkillDomain>('other')
 const previewLabel = ref('')
 
 let suggestTimer = 0
+
+/** 备注弹框 */
+const noteOpen = ref(false)
+const noteSaving = ref(false)
+const noteTarget = ref<SkillItem | null>(null)
+const noteDraft = ref('')
+
+/** 打开备注弹框 */
+function openNoteDialog(item: SkillItem) {
+  noteTarget.value = item
+  noteDraft.value = item.note ?? ''
+  noteOpen.value = true
+}
+
+/** 关闭备注弹框 */
+function closeNoteDialog() {
+  if (noteSaving.value) {
+    return
+  }
+  noteOpen.value = false
+  noteTarget.value = null
+  noteDraft.value = ''
+}
+
+/** 保存备注 */
+async function saveNote() {
+  const item = noteTarget.value
+  if (!item || noteSaving.value) {
+    return
+  }
+  noteSaving.value = true
+  try {
+    const trimmed = noteDraft.value.trim()
+    const updated = await updateSkillNote(item.id, trimmed || null)
+    patchItem(updated)
+    noteOpen.value = false
+    noteTarget.value = null
+    noteDraft.value = ''
+    showToast(trimmed ? '备注已保存' : '备注已清除')
+  } catch (e) {
+    showToast(formatFetchError(e))
+  } finally {
+    noteSaving.value = false
+  }
+}
+
+/**
+ * 删除自定义技能（二次确认）
+ */
+async function removeCustomSkill() {
+  const item = noteTarget.value
+  if (!item?.isCustom || noteSaving.value) {
+    return
+  }
+  const ok = await confirm({
+    title: '删除这条自定义技能？',
+    message: `删除后不可恢复。\n\n${item.emoji} ${item.label}`,
+    confirmText: '删除',
+    cancelText: '再想想',
+    danger: true,
+  })
+  if (!ok) {
+    return
+  }
+  noteSaving.value = true
+  try {
+    await deleteSkill(item.id)
+    removeItem(item.id)
+    noteOpen.value = false
+    noteTarget.value = null
+    noteDraft.value = ''
+    showToast('已删除')
+  } catch (e) {
+    showToast(formatFetchError(e))
+  } finally {
+    noteSaving.value = false
+  }
+}
+
+/** 从本地列表移除技能 */
+function removeItem(skillId: string) {
+  for (const g of groups.value) {
+    const idx = g.items.findIndex((i) => i.id === skillId)
+    if (idx >= 0) {
+      g.items.splice(idx, 1)
+      g.total = g.items.length
+      g.doneCount = g.items.filter((i) => i.status === 'done').length
+      break
+    }
+  }
+  groups.value = groups.value.filter((g) => g.total > 0)
+}
 
 /** 总进度 */
 const progress = computed(() => {
@@ -134,14 +236,14 @@ async function confirmAdd() {
 }
 
 /**
- * 点击循环：todo → done → emerging → todo
+ * 点击循环：未观察 → 刚出现 → 已掌握 → 未观察
  */
 async function cycleStatus(item: SkillItem) {
   const next: SkillStatus =
     item.status === 'todo'
-      ? 'done'
-      : item.status === 'done'
-        ? 'emerging'
+      ? 'emerging'
+      : item.status === 'emerging'
+        ? 'done'
         : 'todo'
 
   try {
@@ -201,7 +303,7 @@ onMounted(() => {
       <div>
         <h1 class="page__title">🌱 技能地图</h1>
         <p class="page__desc">
-          只记可观察行为。点一下切换：未观察 → 已掌握 → 刚出现。也可自己添加。
+          只记可观察行为。点一下切换：未观察 → 刚出现 → 已掌握。也可自己添加。
         </p>
       </div>
       <div class="page__hero-actions">
@@ -229,25 +331,40 @@ onMounted(() => {
         >
       </h2>
       <div class="domain__grid">
-        <button
+        <div
           v-for="item in group.items"
           :key="item.id"
-          type="button"
           class="skill"
-          :class="`skill--${item.status}`"
+          :class="[`skill--${item.status}`, { 'skill--has-note': item.note }]"
+          role="button"
+          tabindex="0"
           @click="cycleStatus(item)"
+          @keydown.enter.prevent="cycleStatus(item)"
         >
           <span class="skill__emoji" aria-hidden="true">{{ item.emoji }}</span>
           <span class="skill__label">{{ item.label }}</span>
-          <span class="skill__badge">
-            <template v-if="item.status === 'done'">已掌握</template>
-            <template v-else-if="item.status === 'emerging'">刚出现</template>
-            <template v-else>未观察</template>
+          <span class="skill__head-actions">
+            <button
+              type="button"
+              class="skill__note-btn"
+              :class="{ 'is-active': item.note }"
+              title="备注"
+              aria-label="编辑备注"
+              @click.stop="openNoteDialog(item)"
+            >
+              📝
+            </button>
+            <span class="skill__badge">
+              <template v-if="item.status === 'done'">已掌握</template>
+              <template v-else-if="item.status === 'emerging'">刚出现</template>
+              <template v-else>未观察</template>
+            </span>
           </span>
-          <span v-if="skillMetaText(item)" class="skill__meta">{{
+          <span v-if="item.note" class="skill__note">{{ item.note }}</span>
+          <span v-else-if="skillMetaText(item)" class="skill__meta">{{
             skillMetaText(item)
           }}</span>
-        </button>
+        </div>
       </div>
     </section>
 
@@ -285,6 +402,38 @@ onMounted(() => {
       </p>
       <p class="add-hint">
         用 AI 自动选 emoji 和分类；无法归类时进「其他」。
+      </p>
+    </MiaFormDialog>
+
+    <MiaFormDialog
+      v-model:open="noteOpen"
+      :title="noteTarget ? `${noteTarget.label} · 备注` : '备注'"
+      :emoji="noteTarget?.emoji ?? '📝'"
+      confirm-text="保存"
+      :loading="noteSaving"
+      @confirm="saveNote"
+      @cancel="closeNoteDialog"
+    >
+      <label class="add-field">
+        <span class="add-field__label">观察记录（选填，最多 200 字）</span>
+        <textarea
+          v-model="noteDraft"
+          class="mia-input note-textarea"
+          rows="4"
+          maxlength="200"
+          placeholder="例如：8 月在公园第一次自己穿"
+          :disabled="noteSaving"
+        />
+      </label>
+      <p v-if="noteTarget?.isCustom" class="note-delete">
+        <button
+          type="button"
+          class="note-delete__btn"
+          :disabled="noteSaving"
+          @click="removeCustomSkill"
+        >
+          删除这条自定义技能
+        </button>
       </p>
     </MiaFormDialog>
 
@@ -418,6 +567,10 @@ onMounted(() => {
     background var(--dur) var(--ease-soft);
 }
 
+.skill--has-note {
+  border-style: dashed;
+}
+
 .skill:hover {
   transform: translate(-1px, -2px);
   box-shadow: var(--shadow-pop);
@@ -454,8 +607,6 @@ onMounted(() => {
 }
 
 .skill__badge {
-  justify-self: end;
-  align-self: start;
   padding: 2px 10px;
   border: 2px solid var(--stroke-color);
   border-radius: var(--r-pill);
@@ -463,6 +614,44 @@ onMounted(() => {
   font-weight: 800;
   background: var(--c-cream);
   white-space: nowrap;
+}
+
+.skill__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: end;
+  align-self: start;
+}
+
+.skill__note-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid var(--stroke-color);
+  border-radius: var(--r-pill);
+  background: var(--c-cream);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.72;
+  transition:
+    transform var(--dur) var(--ease-bounce),
+    opacity var(--dur) var(--ease-soft);
+}
+
+.skill__note-btn:hover,
+.skill__note-btn.is-active {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.skill__note-btn.is-active {
+  background: var(--c-honey-soft);
+  border-color: var(--c-honey);
 }
 
 .skill--done .skill__badge {
@@ -480,6 +669,17 @@ onMounted(() => {
   font-size: var(--fs-xs);
   color: var(--c-ink-2);
   line-height: 1.25;
+}
+
+.skill__note {
+  grid-column: 2;
+  font-size: var(--fs-xs);
+  color: var(--c-ink-2);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .toast {
@@ -523,5 +723,33 @@ onMounted(() => {
   font-size: var(--fs-xs);
   color: var(--c-ink-3);
   line-height: 1.45;
+}
+
+.note-textarea {
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.note-delete {
+  margin: 14px 0 0;
+  text-align: center;
+}
+
+.note-delete__btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--c-coral);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.note-delete__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, watch } from 'vue'
+import { miaConfirmState } from '@/composables/useMiaConfirm'
 
 const props = withDefaults(
   defineProps<{
@@ -52,6 +53,9 @@ function onConfirm() {
  */
 function onKeydown(e: KeyboardEvent) {
   if (!props.open || props.loading) {
+    return
+  }
+  if (miaConfirmState.open) {
     return
   }
   if (e.key === 'Escape') {

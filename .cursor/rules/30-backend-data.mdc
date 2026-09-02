@@ -81,7 +81,7 @@ GET    /photos/:id/file?v=thumb|original
 GET    /skills
 POST   /skills                       # 自定义
 PUT    /skills/:id/mark              # todo|emerging|done，可带 note
-# 进行中：备注专用路由、DELETE 自定义（service 有，controller 未挂）
+# PATCH /api/skills/:id/note、DELETE /api/skills/:id（仅自定义）
 
 GET    /ai/status
 POST   /ai/chat

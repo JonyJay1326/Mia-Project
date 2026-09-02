@@ -17,9 +17,9 @@
 
 **仍不做 / 后置：**
 
-- 语录的搜索 / 标签 / 导出（等攒够量、确认会用了再加）
+- 语录的搜索 / 标签 / 导出（搜索已实现；标签与导出等攒够量再加）
 - **Service Worker** —— 无域名无 HTTPS，见 7.1；IndexedDB 草稿队列照做
-- 技能备注编辑 UI、删除自定义技能 API/UI（服务端方法已有，路由与前端未挂 —— **进行中**）
+- 技能备注编辑 UI、删除自定义技能 API/UI（`PATCH .../note`、`DELETE /api/skills/:id`）
 - 常模诊断、倒退预警、判断写回 events/quotes
 
 **鉴权：**
@@ -824,9 +824,19 @@ CREATE INDEX idx_quotes_month ON quotes(month_age DESC, said_at DESC);
 - 有 `photo_id` 的（阶段三），卡片顶部配图
 - 右下角显示日期（小字）
 
-#### 首页「今日一条」（可选，语录取到 20 条后再做）
+#### 首页「今日一条」（≥20 条后显示）
 
-每天打开首页随机显示一条历史语录，带一点仪式感。数据少的时候每天都是同一条，反而尴尬，所以等攒够再做。
+每天打开快速记录页展示一条历史语录（东八区按日稳定选取，同一天内不变）。不足 20 条时不显示。
+
+**接口：** `GET /api/quotes?daily=1` → `QuoteRecord | null`
+
+#### 搜索
+
+语录墙顶栏模糊搜索原话 / 上下文 / 感受：`GET /api/quotes?q=关键词` → 扁平列表。
+
+#### 编辑
+
+`PATCH /api/quotes/:id` 可改 `context` / `note` / `saidAt`（原话 `content` 前端只读展示）。语录墙与时间线抽屉均有「编辑 / 补详情」入口。
 
 ### 4.6.5 跟其他模块的关系
 
@@ -837,7 +847,7 @@ CREATE INDEX idx_quotes_month ON quotes(month_age DESC, said_at DESC);
 | **将来：导出成册**  | 数据模型已支持，将来能做「渺言妙语」纪念册 PDF            |
 | **AI 咨询** | 可结合语录事实回答；判断不写回 quotes                     |
 
-> **先做窄**：第一版只要「录入 + 按月龄展示」。搜索、标签、导出都等用起来再说。
+> **标签 / 导出成册** 仍后置；搜索、编辑、今日一句已落地。
 
 ---
 
@@ -964,10 +974,12 @@ DELETE /api/events/:id
 
 # 语录（渺言妙语）
 POST   /api/quotes            创建
-GET    /api/quotes            列表（按月龄分组返回，见 4.6.4）
-GET    /api/quotes?random=1   随机一条（毯子精灵气泡用，见 9.1.6）
+GET    /api/quotes            列表（按月龄分组）
+GET    /api/quotes?random=1   随机一条（毯子精灵气泡）
+GET    /api/quotes?daily=1    今日一句（≥20 条，按东八区日稳定选取）
+GET    /api/quotes?q=关键词   搜索（原话/上下文/感受）
 GET    /api/quotes/:id
-PATCH  /api/quotes/:id        补充上下文/解读
+PATCH  /api/quotes/:id        context / note / saidAt
 DELETE /api/quotes/:id
 
 GET    /api/health
@@ -989,7 +1001,8 @@ DELETE /api/photos/:id
 GET    /api/skills
 POST   /api/skills            自定义技能（可 AI 分类）
 PUT    /api/skills/:id/mark   body: { status: todo|emerging|done, note? }
-# 进行中：备注专用接口、DELETE 自定义技能（服务有方法，路由未挂）
+PATCH  /api/skills/:id/note   body: { note? }
+DELETE /api/skills/:id        仅自定义技能
 
 # AI（阶段三）
 GET    /api/ai/status

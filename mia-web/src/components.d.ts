@@ -23,6 +23,7 @@ declare module 'vue' {
     MiaFormDialog: typeof import('./components/MiaFormDialog.vue')['default']
     MiaMarkdown: typeof import('./components/MiaMarkdown.vue')['default']
     QuoteBubble: typeof import('./components/BlanketSprite/QuoteBubble.vue')['default']
+    QuoteEditDialog: typeof import('./components/QuoteEditDialog.vue')['default']
     RankCard: typeof import('./components/analytics/RankCard.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

@@ -23,7 +23,7 @@ alwaysApply: true
 | 项 | 说明 |
 |---|---|
 | Service Worker | 无域名无 HTTPS，见规格 7.1 |
-| 技能备注 UI / 删自定义 | 服务端方法已有，路由与前端未挂（进行中） |
+| 技能备注 / 删自定义 | 已挂 `PATCH .../note`、`DELETE /api/skills/:id` |
 | 应用内登录 | **可选已实现**（`MIA_AUTH_*`）；公网主挡仍是 Nginx Basic Auth |
 
 ## ⚠️ 关键约束
