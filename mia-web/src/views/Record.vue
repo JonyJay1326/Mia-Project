@@ -34,6 +34,7 @@ import type { QuoteRecord } from '@/types/event'
 import { createSkill } from '@/api/skills'
 import { skillDomainLabel } from '@/config/skillDomains'
 import { useDraftStore } from '@/stores/draft'
+import { createId } from '@/utils/id'
 import { dayKey, formatTime } from '@/utils/timeline'
 
 const route = useRoute()
@@ -218,7 +219,7 @@ async function submit() {
   const summaryText = form.summary.trim()
   const eventType = form.type
   const payload = {
-    id: crypto.randomUUID(),
+    id: createId(),
     happenedAt,
     type: eventType,
     summary: summaryText,

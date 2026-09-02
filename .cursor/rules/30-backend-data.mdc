@@ -27,7 +27,7 @@ Legacy 只读：`health | question`。
 
 ## ⚠️ POST 必须幂等（最容易踩的坑）
 
-离线重放必然重复提交。用客户端生成的 `id`（`crypto.randomUUID()`）做主键：
+离线重放必然重复提交。用客户端生成的 `id`（`createId()`，HTTP 非 localhost 也可用）做主键：
 
 ```sql
 INSERT OR IGNORE INTO events (...) VALUES (...)

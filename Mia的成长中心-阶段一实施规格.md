@@ -472,7 +472,7 @@ CREATE INDEX idx_events_type ON events(type);
 
 **设计说明：**
 
-- **`id` 由客户端生成**（`crypto.randomUUID()`）—— 离线状态下也要能建记录，不能依赖数据库自增
+- **`id` 由客户端生成**（`createId()`，兼容 HTTP 非 localhost；优先 `crypto.randomUUID`）—— 离线状态下也要能建记录，不能依赖数据库自增
 - **`napped` 是 Mia 专用字段**。档案显示她午睡不规律，这个字段用来对比"睡了 vs 没睡"两天的情绪差异
 - **`month_age` 冗余但值得**。Mia 出生日期 2024-05-17，写入时算好，查询时省事
 - **崩溃详情字段（intensity/duration/coping/outcome）全部可空**，支持"先提交，后补详情"

@@ -10,6 +10,7 @@ import {
   saveScenes,
   sortScenesForDisplay,
 } from '@/config/scenes'
+import { createId } from '@/utils/id'
 
 const emit = defineEmits<{
   /** 选中某张场景卡片 */
@@ -168,7 +169,7 @@ async function addScene() {
   adding.value = true
   try {
     const icon = await resolveEmoji(label)
-    const id = `custom-${crypto.randomUUID().slice(0, 8)}`
+    const id = `custom-${createId().slice(0, 8)}`
     const scene: Scene = {
       id,
       label,
