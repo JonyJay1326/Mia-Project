@@ -185,7 +185,7 @@ export class AiService {
     ].join('\n')
   }
 
-  /** 拼装统计 + 近期事件/语录/技能摘要 */
+  /** 拼装统计 + 近期事件 / 近30天情绪 / 语录 / 技能摘要 */
   private buildFactsBlock(days: number): string {
     const stats = this.analyticsService.getMeltdownAnalytics(days)
     const lines: string[] = []
@@ -229,6 +229,31 @@ export class AiService {
       lines.push(
         `- [${ev.type}] ${ev.happenedAt} ${ev.summary || '（无摘要）'} chips=${(ev.chips ?? []).join('|') || '—'}`,
       )
+    }
+
+    // 情绪观察单独拉近 30 天，便于咨询侧看情绪走势（与上面「近期 12 条」并存）
+    const emotionSince = new Date()
+    emotionSince.setDate(emotionSince.getDate() - 30)
+    const emotionRows = this.dbService.db
+      .prepare(
+        `SELECT * FROM events
+         WHERE type = 'emotion' AND happened_at >= ?
+         ORDER BY happened_at DESC
+         LIMIT 40`,
+      )
+      .all(emotionSince.toISOString()) as EventRow[]
+    lines.push(
+      `近 30 天情绪事件（${emotionRows.length} 条，最多 40）：`,
+    )
+    if (!emotionRows.length) {
+      lines.push('- （无）')
+    } else {
+      for (const row of emotionRows) {
+        const ev = mapEventRow(row)
+        lines.push(
+          `- ${ev.happenedAt} ${ev.summary || '（无摘要）'} chips=${(ev.chips ?? []).join('|') || '—'}`,
+        )
+      }
     }
 
     const quotes = this.dbService.db

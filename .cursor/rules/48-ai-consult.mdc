@@ -7,7 +7,7 @@ alwaysApply: false
 
 - 默认 **DeepSeek**：`MIA_AI_BASE_URL=https://api.deepseek.com/v1`，`MIA_AI_MODEL=deepseek-chat`
 - 密钥只放服务端 `server/.env` 的 `MIA_AI_API_KEY`，前端永不带 key
-- **每次请求** system prompt 附带完整 `Mia档案.md` + 近期统计/事件/语录/技能事实
+- **每次请求** system prompt 附带完整 `Mia档案.md` + 近期统计/事件（含近 30 天情绪，最多 40 条）/语录/技能事实
 - 硬性要求：结合档案回答，优先「已验证清单」；不写回 events/quotes
 - 咨询会话写入 `ai_chats`（可历史查看 / 删除）；分析页「一键解读」不入库
 - 咨询页「思考中」气泡有弹跳圆点动效（尊重 `prefers-reduced-motion`）
