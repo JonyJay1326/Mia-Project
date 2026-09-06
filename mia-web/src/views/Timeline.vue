@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import EventItem from '@/components/EventItem.vue'
+import TimelineAiDialog from '@/components/TimelineAiDialog.vue'
 import TypeChip from '@/components/TypeChip.vue'
 import EventMediaAttach from '@/components/EventMediaAttach.vue'
 import QuoteEditDialog from '@/components/QuoteEditDialog.vue'
@@ -54,6 +55,8 @@ const editing = ref(false)
 const quoteEditOpen = ref(false)
 const saving = ref(false)
 const removingId = ref<string | null>(null)
+const aiOpen = ref(false)
+const aiItem = ref<TimelineItem | null>(null)
 
 /** 按筛选过滤后的列表 */
 const filtered = computed(() => {
@@ -179,6 +182,24 @@ function openItem(item: TimelineItem) {
     }
   }
   drawerOpen.value = true
+}
+
+/** 打开 AI 分析弹框（先二次确认，不打开详情抽屉） */
+async function openAiAnalyze(item: TimelineItem) {
+  const preview =
+    item.kind === 'quote' ? `「${item.title}」` : item.title
+  const ok = await confirm({
+    title: '用 AI 分析这条？',
+    message: `会结合档案与近期事实解读：\n\n${preview}`,
+    confirmText: '开始分析',
+    cancelText: '再想想',
+    danger: false,
+  })
+  if (!ok) {
+    return
+  }
+  aiItem.value = item
+  aiOpen.value = true
 }
 
 /** 关闭抽屉 */
@@ -392,6 +413,7 @@ onUnmounted(() => {
                 :removing="removingId === item.id"
                 @select="openItem(item)"
                 @remove="removeItem(item)"
+                @analyze="openAiAnalyze(item)"
               />
             </div>
           </div>
@@ -566,6 +588,8 @@ onUnmounted(() => {
     :quote="selected?.quote ?? null"
     @saved="onQuoteSaved"
   />
+
+  <TimelineAiDialog v-model:open="aiOpen" :item="aiItem" />
 </template>
 
 <style scoped>
