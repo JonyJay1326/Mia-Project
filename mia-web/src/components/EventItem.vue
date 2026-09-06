@@ -17,6 +17,7 @@ defineProps<{
 const emit = defineEmits<{
   select: []
   remove: []
+  analyze: []
 }>()
 
 /** 枚举值转中文标签 */
@@ -77,11 +78,22 @@ function labelOf(
         item.event.napped === 1 ? '是' : item.event.napped === 0 ? '否' : '—'
       }}
     </p>
+
+    <button
+      type="button"
+      class="event-item__ai"
+      aria-label="AI 分析这条记录"
+      title="AI 分析"
+      @click.stop="emit('analyze')"
+    >
+      🤖 分析
+    </button>
   </article>
 </template>
 
 <style scoped>
 .event-item {
+  position: relative;
   width: 100%;
   text-align: left;
   cursor: pointer;
@@ -90,7 +102,7 @@ function labelOf(
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 14px 16px;
+  padding: 14px 16px 40px;
 }
 
 .event-item.is-active {
@@ -157,6 +169,27 @@ function labelOf(
   margin: 0;
   font-size: var(--fs-xs);
   color: var(--c-ink-2);
+}
+
+.event-item__ai {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border: var(--stroke-light);
+  border-radius: var(--r-pill);
+  background: var(--c-grape-soft);
+  color: var(--c-ink);
+  border-color: var(--c-grape);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.event-item__ai:hover {
+  box-shadow: var(--shadow-pop);
 }
 
 .desktop-only {

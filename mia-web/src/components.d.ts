@@ -30,6 +30,7 @@ declare module 'vue' {
     SceneCards: typeof import('./components/SceneCards.vue')['default']
     SpriteImage: typeof import('./components/BlanketSprite/SpriteImage.vue')['default']
     StatBar: typeof import('./components/analytics/StatBar.vue')['default']
+    TimelineAiDialog: typeof import('./components/TimelineAiDialog.vue')['default']
     TypeChip: typeof import('./components/TypeChip.vue')['default']
   }
 }
