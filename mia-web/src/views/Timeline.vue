@@ -3,7 +3,10 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import EventItem from '@/components/EventItem.vue'
 import TypeChip from '@/components/TypeChip.vue'
+import EventMediaAttach from '@/components/EventMediaAttach.vue'
+import QuoteEditDialog from '@/components/QuoteEditDialog.vue'
 import { deleteEvent, deleteQuote, fetchEvents, fetchQuotesGrouped, patchEvent } from '@/api/events'
+import { photoAssetUrl } from '@/api/photos'
 import type { EventRecord, QuoteRecord, TimelineItemType } from '@/types/event'
 import { formatMonthAge, monthAge, BIRTH_DATE } from '@/utils/date'
 import {
@@ -14,19 +17,25 @@ import {
   monthKey,
   type TimelineItem,
 } from '@/utils/timeline'
-import { CAREGIVER_CHIPS, LOCATION_CHIPS, TRIGGER_CHIPS } from '@/config/chips'
+import { TRIGGER_CHIPS, COPING_CHIPS, caregiverLabel, locationLabel } from '@/config/chips'
+import { isDefaultTimelineFilterType } from '@/config/eventTypes'
 import { useEventsStore } from '@/stores/events'
 import { useMiaConfirm } from '@/composables/useMiaConfirm'
 
-type FilterType = 'all' | TimelineItemType
+type FilterType = 'all' | 'other' | TimelineItemType
 
 const FILTERS: { value: FilterType; label: string }[] = [
   { value: 'all', label: '全部' },
   { value: 'meltdown', label: '崩溃' },
   { value: 'quote', label: '语录' },
+  { value: 'highlight', label: '高光' },
   { value: 'skill', label: '技能' },
-  { value: 'health', label: '健康' },
-  { value: 'question', label: '疑问' },
+  { value: 'daily', label: '日常' },
+  { value: 'emotion', label: '情绪' },
+  { value: 'diet', label: '吃喝拉撒睡' },
+  { value: 'social', label: '社交' },
+  { value: 'medical', label: '医疗' },
+  { value: 'other', label: '其他' },
 ]
 
 const router = useRouter()
@@ -42,12 +51,17 @@ const filter = ref<FilterType>('all')
 const activeMonth = ref<string | null>(null)
 const drawerOpen = ref(false)
 const editing = ref(false)
+const quoteEditOpen = ref(false)
 const saving = ref(false)
+const removingId = ref<string | null>(null)
 
 /** 按筛选过滤后的列表 */
 const filtered = computed(() => {
   if (filter.value === 'all') {
     return items.value
+  }
+  if (filter.value === 'other') {
+    return items.value.filter((i) => !isDefaultTimelineFilterType(i.type))
   }
   return items.value.filter((i) => i.type === filter.value)
 })
@@ -158,7 +172,11 @@ function openItem(item: TimelineItem) {
   eventsStore.selectEvent(item.id)
   editing.value = false
   if (item.event) {
-    editForm.value = { ...item.event }
+    editForm.value = {
+      ...item.event,
+      photoId: item.event.photoId ?? null,
+      coping: [...(item.event.coping ?? [])],
+    }
   }
   drawerOpen.value = true
 }
@@ -167,6 +185,7 @@ function openItem(item: TimelineItem) {
 function closeDrawer() {
   drawerOpen.value = false
   editing.value = false
+  quoteEditOpen.value = false
   eventsStore.selectEvent(null)
 }
 
@@ -191,6 +210,18 @@ function dayHeading(day: string) {
   return `${day}  周${week} · ${age}`
 }
 
+/** 编辑态切换应对方式多选 */
+function toggleEditCoping(label: string) {
+  const current = editForm.value.coping ?? []
+  const set = new Set(current)
+  if (set.has(label)) {
+    set.delete(label)
+  } else {
+    set.add(label)
+  }
+  editForm.value.coping = Array.from(set)
+}
+
 /** 保存事件补丁 */
 async function saveEdit() {
   if (!selected.value?.event) {
@@ -208,15 +239,14 @@ async function saveEdit() {
   }
 }
 
-/** 删除当前事件或语录 */
-async function removeSelected() {
-  if (!selected.value) {
-    return
-  }
-  const kindLabel = selected.value.kind === 'quote' ? '语录' : '记录'
+/** 删除指定时间线条目（二次确认） */
+async function removeItem(item: TimelineItem) {
+  const kindLabel = item.kind === 'quote' ? '语录' : '记录'
+  const preview =
+    item.title.length > 24 ? `${item.title.slice(0, 24)}…` : item.title
   const ok = await confirm({
     title: `删除这条${kindLabel}？`,
-    message: '删除后不可恢复。',
+    message: `删除后不可恢复。\n\n「${preview}」`,
     confirmText: '删除',
     cancelText: '再想想',
     danger: true,
@@ -224,13 +254,40 @@ async function removeSelected() {
   if (!ok) {
     return
   }
-  if (selected.value.kind === 'event') {
-    await deleteEvent(selected.value.id)
-  } else {
-    await deleteQuote(selected.value.id)
+  removingId.value = item.id
+  try {
+    if (item.kind === 'event') {
+      await deleteEvent(item.id)
+    } else {
+      await deleteQuote(item.id)
+    }
+    if (eventsStore.selectedId === item.id) {
+      closeDrawer()
+    }
+    await load()
+  } catch (err) {
+    console.error(err)
+  } finally {
+    removingId.value = null
   }
-  closeDrawer()
-  await load()
+}
+
+/** 删除当前抽屉中选中的事件或语录 */
+async function removeSelected() {
+  if (!selected.value) {
+    return
+  }
+  await removeItem(selected.value)
+}
+
+/** 语录编辑保存后更新本地列表 */
+function onQuoteSaved(updated: QuoteRecord) {
+  const idx = quoteRows.value.findIndex((q) => q.id === updated.id)
+  if (idx >= 0) {
+    quoteRows.value[idx] = updated
+  }
+  rebuildItems()
+  quoteEditOpen.value = false
 }
 
 /** Esc 关闭抽屉 */
@@ -332,7 +389,9 @@ onUnmounted(() => {
                 :key="item.id"
                 :item="item"
                 :active="eventsStore.selectedId === item.id"
+                :removing="removingId === item.id"
                 @select="openItem(item)"
+                @remove="removeItem(item)"
               />
             </div>
           </div>
@@ -377,6 +436,13 @@ onUnmounted(() => {
             我的感受：{{ selected.quote.note }}
           </p>
           <div class="drawer__actions">
+            <button
+              type="button"
+              class="mia-btn mia-btn--primary"
+              @click="quoteEditOpen = true"
+            >
+              编辑 / 补详情
+            </button>
             <button type="button" class="mia-btn" @click="removeSelected">删除</button>
           </div>
         </template>
@@ -389,8 +455,8 @@ onUnmounted(() => {
               · {{ formatMonthAge(selected.event.monthAge) }}
             </p>
             <ul class="drawer__facts">
-              <li>照护：{{ labelOf(CAREGIVER_CHIPS, selected.event.caregiver) }}</li>
-              <li>地点：{{ labelOf(LOCATION_CHIPS, selected.event.location) }}</li>
+              <li>记录人：{{ caregiverLabel(selected.event.caregiver) }}</li>
+              <li>地点：{{ locationLabel(selected.event.location) }}</li>
               <li v-if="selected.event.trigger">
                 触发：{{ labelOf(TRIGGER_CHIPS, selected.event.trigger) }}
               </li>
@@ -405,6 +471,21 @@ onUnmounted(() => {
               </li>
               <li v-if="selected.event.outcome">结果：{{ selected.event.outcome }}</li>
             </ul>
+            <a
+              v-if="selected.event.photoId"
+              class="drawer__media mia-card"
+              :href="photoAssetUrl(`/photos/${selected.event.photoId}/file?v=original`)"
+              target="_blank"
+              rel="noopener"
+              @click.stop
+            >
+              <img
+                class="drawer__media-thumb"
+                :src="photoAssetUrl(`/photos/${selected.event.photoId}/file?v=thumb`)"
+                alt="附件预览"
+              />
+              <span class="drawer__media-caption">查看附件</span>
+            </a>
             <div class="drawer__actions">
               <button type="button" class="mia-btn mia-btn--primary" @click="editing = true">
                 编辑 / 补详情
@@ -415,29 +496,54 @@ onUnmounted(() => {
 
           <template v-else>
             <label class="drawer__label">摘要</label>
-            <input v-model="editForm.summary" class="mia-input" type="text" />
-            <label class="drawer__label">强度</label>
-            <div class="drawer__chips">
-              <button
-                v-for="n in 5"
-                :key="n"
-                type="button"
-                class="mia-chip"
-                :class="{ 'is-active': editForm.intensity === n }"
-                @click="editForm.intensity = n"
-              >
-                {{ n }}
-              </button>
-            </div>
-            <label class="drawer__label">时长（分钟）</label>
-            <input
-              v-model.number="editForm.durationMin"
-              class="mia-input"
-              type="number"
-              min="0"
+            <textarea
+              v-model="editForm.summary"
+              class="mia-input drawer__textarea"
+              rows="3"
             />
+            <template v-if="selected.event.type === 'meltdown'">
+              <label class="drawer__label">强度</label>
+              <div class="drawer__chips">
+                <button
+                  v-for="n in 5"
+                  :key="n"
+                  type="button"
+                  class="mia-chip"
+                  :class="{ 'is-active': editForm.intensity === n }"
+                  @click="editForm.intensity = n"
+                >
+                  {{ n }}
+                </button>
+              </div>
+              <label class="drawer__label">时长（分钟）</label>
+              <input
+                v-model.number="editForm.durationMin"
+                class="mia-input"
+                type="number"
+                min="0"
+              />
+              <label class="drawer__label">应对方式</label>
+              <div class="drawer__chips">
+                <button
+                  v-for="label in COPING_CHIPS"
+                  :key="label"
+                  type="button"
+                  class="mia-chip"
+                  :class="{ 'is-active': (editForm.coping ?? []).includes(label) }"
+                  @click="toggleEditCoping(label)"
+                >
+                  {{ label }}
+                </button>
+              </div>
+            </template>
             <label class="drawer__label">结果</label>
-            <input v-model="editForm.outcome" class="mia-input" type="text" />
+            <textarea
+              v-model="editForm.outcome"
+              class="mia-input drawer__textarea"
+              rows="3"
+              placeholder="后来怎样了"
+            />
+            <EventMediaAttach v-model:photo-id="editForm.photoId" />
             <div class="drawer__actions">
               <button
                 type="button"
@@ -454,6 +560,12 @@ onUnmounted(() => {
       </aside>
     </div>
   </div>
+
+  <QuoteEditDialog
+    v-model:open="quoteEditOpen"
+    :quote="selected?.quote ?? null"
+    @saved="onQuoteSaved"
+  />
 </template>
 
 <style scoped>
@@ -645,6 +757,32 @@ onUnmounted(() => {
   line-height: 1.7;
 }
 
+.drawer__media {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  margin-bottom: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.drawer__media-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  border: var(--stroke-light);
+  background: var(--c-cream-3);
+  flex-shrink: 0;
+}
+
+.drawer__media-caption {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--c-sky);
+}
+
 .drawer__actions {
   display: flex;
   flex-wrap: wrap;
@@ -659,6 +797,12 @@ onUnmounted(() => {
   font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--c-ink-2);
+}
+
+.drawer__textarea {
+  min-height: 4.8em;
+  resize: vertical;
+  line-height: 1.45;
 }
 
 .drawer__chips {

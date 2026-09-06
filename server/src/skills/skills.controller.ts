@@ -1,8 +1,18 @@
-import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+} from '@nestjs/common'
 import {
   CreateSkillInput,
   MarkSkillInput,
   SkillsService,
+  UpdateNoteInput,
 } from './skills.service'
 
 /** 技能地图接口 */
@@ -36,6 +46,26 @@ export class SkillsController {
   @Put(':id/mark')
   mark(@Param('id') id: string, @Body() body: MarkSkillInput) {
     const data = this.skillsService.mark(id, body)
+    return { ok: true, data }
+  }
+
+  /**
+   * 更新备注（无标记时默认记为刚出现）
+   * PATCH /api/skills/:id/note
+   */
+  @Patch(':id/note')
+  updateNote(@Param('id') id: string, @Body() body: UpdateNoteInput) {
+    const data = this.skillsService.updateNote(id, body.note ?? null)
+    return { ok: true, data }
+  }
+
+  /**
+   * 删除自定义技能（目录项不可删）
+   * DELETE /api/skills/:id
+   */
+  @Delete(':id')
+  removeCustom(@Param('id') id: string) {
+    const data = this.skillsService.removeCustom(id)
     return { ok: true, data }
   }
 }

@@ -26,6 +26,7 @@ export function mapEventRow(row: EventRow): EventRecord {
     outcome: row.outcome,
     caregiver: (row.caregiver as CaregiverType) ?? 'mom',
     napped: (row.napped as 0 | 1 | null) ?? null,
+    photoId: row.photo_id ?? null,
     monthAge: row.month_age ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

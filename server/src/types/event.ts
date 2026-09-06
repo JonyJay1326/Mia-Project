@@ -1,8 +1,22 @@
 /** 事件类型（语录单独建表，不在此枚举） */
-export type EventType = 'meltdown' | 'skill' | 'health' | 'question'
+export type EventType =
+  | 'meltdown'
+  | 'skill'
+  | 'daily'
+  | 'emotion'
+  | 'diet'
+  | 'social'
+  | 'medical'
+  | 'highlight'
+
+/** 历史类型（仅兼容已有数据） */
+export type LegacyEventType = 'health' | 'question' | 'sleep'
+
+/** 任意事件类型：内置 + 历史 + 自定义 key */
+export type AnyEventType = EventType | LegacyEventType | (string & {})
 
 /** 时间线展示用类型（含语录） */
-export type TimelineItemType = EventType | 'quote'
+export type TimelineItemType = AnyEventType | 'quote'
 
 /** 地点 */
 export type LocationType =
@@ -10,6 +24,9 @@ export type LocationType =
   | 'outdoor'
   | 'mall'
   | 'grandparents'
+  | 'taoshudi'
+  | 'tongtong'
+  | 'school'
   | 'other'
 
 /** 触发原因 */
@@ -23,14 +40,14 @@ export type TriggerType =
   | 'bedtime'
   | 'unknown'
 
-/** 照护人 */
+/** 记录人（录入仅用爸妈；爷奶仅兼容旧数据） */
 export type CaregiverType = 'mom' | 'dad' | 'grandma' | 'grandpa'
 
 /** 创建 / 更新事件的请求体（camelCase，与前端一致） */
 export interface EventInput {
   id: string
   happenedAt: string
-  type: EventType
+  type: AnyEventType
   summary?: string | null
   chips?: string[]
   location?: LocationType | null
@@ -41,6 +58,8 @@ export interface EventInput {
   outcome?: string | null
   caregiver: CaregiverType
   napped?: 0 | 1 | null
+  /** 关联相册媒体（照片或短视频） */
+  photoId?: string | null
   monthAge?: number
 }
 
@@ -92,6 +111,7 @@ export interface EventRow {
   caregiver: string | null
   napped: number | null
   month_age: number | null
+  photo_id: string | null
   created_at: string
   updated_at: string | null
 }

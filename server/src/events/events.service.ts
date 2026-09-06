@@ -29,11 +29,11 @@ export class EventsService {
         `INSERT OR IGNORE INTO events (
           id, happened_at, type, summary, chips, location, trigger,
           intensity, duration_min, coping, outcome, caregiver, napped,
-          month_age, created_at, updated_at
+          month_age, photo_id, created_at, updated_at
         ) VALUES (
           @id, @happened_at, @type, @summary, @chips, @location, @trigger,
           @intensity, @duration_min, @coping, @outcome, @caregiver, @napped,
-          @month_age, @created_at, @updated_at
+          @month_age, @photo_id, @created_at, @updated_at
         )`,
       )
       .run({
@@ -51,6 +51,7 @@ export class EventsService {
         caregiver: input.caregiver,
         napped: input.napped ?? null,
         month_age: age,
+        photo_id: input.photoId ?? null,
         created_at: now,
         updated_at: null,
       })
@@ -127,6 +128,7 @@ export class EventsService {
           caregiver = @caregiver,
           napped = @napped,
           month_age = @month_age,
+          photo_id = @photo_id,
           updated_at = @updated_at
         WHERE id = @id`,
       )
@@ -145,6 +147,7 @@ export class EventsService {
         caregiver: next.caregiver,
         napped: next.napped ?? null,
         month_age: next.monthAge,
+        photo_id: next.photoId ?? null,
         updated_at: next.updatedAt,
       })
 

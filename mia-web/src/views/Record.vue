@@ -5,6 +5,7 @@ import SceneCards from '@/components/SceneCards.vue'
 import ChipGroup from '@/components/ChipGroup.vue'
 import TypeChip from '@/components/TypeChip.vue'
 import MiaDateTimePicker from '@/components/MiaDateTimePicker.vue'
+import EventMediaAttach from '@/components/EventMediaAttach.vue'
 import type { Scene } from '@/config/scenes'
 import {
   CAREGIVER_CHIPS,
@@ -15,22 +16,24 @@ import {
 import type {
   CaregiverType,
   EventRecord,
-  EventType,
   LocationType,
   TriggerType,
 } from '@/types/event'
 import {
   BIRTH_DATE,
+  formatMonthAge,
   fromDatetimeLocalValue,
   monthAge,
   toDatetimeLocalValue,
 } from '@/utils/date'
 import { loadLastPrefs, saveLastPrefs } from '@/utils/prefs'
 import { request } from '@/api/client'
-import { fetchEvents } from '@/api/events'
+import { fetchEvents, fetchDailyQuote } from '@/api/events'
+import type { QuoteRecord } from '@/types/event'
 import { createSkill } from '@/api/skills'
 import { skillDomainLabel } from '@/config/skillDomains'
 import { useDraftStore } from '@/stores/draft'
+import { createId } from '@/utils/id'
 import { dayKey, formatTime } from '@/utils/timeline'
 
 const route = useRoute()
@@ -41,6 +44,7 @@ const showExtra = ref(false)
 const saving = ref(false)
 const toast = ref('')
 const recent = ref<EventRecord[]>([])
+const dailyQuote = ref<QuoteRecord | null>(null)
 const draftStore = useDraftStore()
 
 const prefs = loadLastPrefs()
@@ -49,7 +53,7 @@ const isBackfill = computed(() => route.query.backfill === '1')
 
 const form = reactive({
   happenedLocal: toDatetimeLocalValue(),
-  type: 'meltdown' as EventType,
+  type: 'meltdown' as string,
   summary: '',
   chips: [] as string[],
   location: prefs.location as LocationType | null,
@@ -60,6 +64,7 @@ const form = reactive({
   durationMin: null as number | null,
   coping: [] as string[],
   outcome: '',
+  photoId: null as string | null,
 })
 
 /** 当前月龄展示 */
@@ -76,6 +81,14 @@ const isMeltdown = computed(() => form.type === 'meltdown')
 /** 是否技能类（保存后同步进技能地图） */
 const isSkill = computed(() => form.type === 'skill')
 
+/** 当前场景自带的一句话 chips（自定义卡） */
+const activeSceneChips = computed(() => {
+  if (!activeSceneId.value) {
+    return null
+  }
+  return sceneCardsRef.value?.getScene(activeSceneId.value)?.chips ?? null
+})
+
 /** 拉取最近几条，给手机首页预览 */
 async function loadRecent() {
   try {
@@ -83,6 +96,20 @@ async function loadRecent() {
   } catch {
     recent.value = []
   }
+}
+
+/** 拉取今日一句（不足 20 条时后端返回 null） */
+async function loadDailyQuote() {
+  try {
+    dailyQuote.value = await fetchDailyQuote()
+  } catch {
+    dailyQuote.value = null
+  }
+}
+
+/** 去语录墙 */
+function goQuotesWall() {
+  void router.push({ name: 'quotes' })
 }
 
 /**
@@ -100,6 +127,7 @@ function onSelectScene(scene: Scene) {
   form.chips = []
   form.summary = ''
   form.coping = []
+  form.photoId = null
   showExtra.value = false
 }
 
@@ -140,6 +168,7 @@ function resetAfterSave() {
   form.coping = []
   form.outcome = ''
   form.napped = null
+  form.photoId = null
   showExtra.value = false
   activeSceneId.value = null
   void loadRecent()
@@ -197,7 +226,7 @@ async function submit() {
   const summaryText = form.summary.trim()
   const eventType = form.type
   const payload = {
-    id: crypto.randomUUID(),
+    id: createId(),
     happenedAt,
     type: eventType,
     summary: summaryText,
@@ -209,7 +238,8 @@ async function submit() {
     coping: form.coping,
     outcome: form.outcome || null,
     caregiver: form.caregiver,
-    napped: form.napped,
+    napped: isSkill.value ? null : form.napped,
+    photoId: form.photoId,
     monthAge: monthAge(BIRTH_DATE, happenedAt),
   }
 
@@ -264,6 +294,7 @@ function onSaveHotkey(e: KeyboardEvent) {
 
 onMounted(() => {
   void loadRecent()
+  void loadDailyQuote()
   window.addEventListener('keydown', onSaveHotkey)
 })
 
@@ -281,6 +312,19 @@ onUnmounted(() => {
         {{ isBackfill ? '改好时间再选场景保存' : '点一张场景卡片 → 选一句话 → 保存' }}
       </p>
     </header>
+
+    <button
+      v-if="dailyQuote && !activeSceneId"
+      type="button"
+      class="mia-card daily-quote"
+      @click="goQuotesWall"
+    >
+      <p class="daily-quote__eyebrow">
+        今日一句 · {{ formatMonthAge(dailyQuote.monthAge) }}
+      </p>
+      <p class="daily-quote__content">「{{ dailyQuote.content }}」</p>
+      <p v-if="dailyQuote.context" class="daily-quote__meta">{{ dailyQuote.context }}</p>
+    </button>
 
     <button
       v-if="!activeSceneId"
@@ -319,6 +363,7 @@ onUnmounted(() => {
         <ChipGroup
           v-model="form.chips"
           :type="form.type"
+          :options="activeSceneChips"
           @pick="onPickSummary"
         />
         <input
@@ -377,7 +422,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="form__block">
+      <div v-if="!isSkill" class="form__block">
         <h3 class="form__label">今天午睡了吗</h3>
         <div class="form__chips">
           <button
@@ -415,48 +460,51 @@ onUnmounted(() => {
         {{ showExtra ? '收起补充详情' : '▸ 补充详情（可稍后）' }}
       </button>
 
-      <div v-if="showExtra && isMeltdown" class="form__extra">
-        <label class="form__label">强度 1–5</label>
-        <div class="form__chips">
-          <button
-            v-for="n in 5"
-            :key="n"
-            type="button"
-            class="mia-chip"
-            :class="{ 'is-active': form.intensity === n }"
-            @click="form.intensity = n"
-          >
-            {{ n }}
-          </button>
-        </div>
-        <label class="form__label">时长（分钟）</label>
-        <input
-          v-model.number="form.durationMin"
-          class="mia-input"
-          type="number"
-          min="0"
-          placeholder="大概几分钟"
-        />
-        <label class="form__label">应对方式</label>
-        <div class="form__chips">
-          <button
-            v-for="label in COPING_CHIPS"
-            :key="label"
-            type="button"
-            class="mia-chip"
-            :class="{ 'is-active': form.coping.includes(label) }"
-            @click="toggleCoping(label)"
-          >
-            {{ label }}
-          </button>
-        </div>
-        <label class="form__label">结果</label>
-        <input
-          v-model="form.outcome"
-          class="mia-input"
-          type="text"
-          placeholder="后来怎样了"
-        />
+      <div v-if="showExtra" class="form__extra">
+        <template v-if="isMeltdown">
+          <label class="form__label">强度 1–5</label>
+          <div class="form__chips">
+            <button
+              v-for="n in 5"
+              :key="n"
+              type="button"
+              class="mia-chip"
+              :class="{ 'is-active': form.intensity === n }"
+              @click="form.intensity = n"
+            >
+              {{ n }}
+            </button>
+          </div>
+          <label class="form__label">时长（分钟）</label>
+          <input
+            v-model.number="form.durationMin"
+            class="mia-input"
+            type="number"
+            min="0"
+            placeholder="大概几分钟"
+          />
+          <label class="form__label">应对方式</label>
+          <div class="form__chips">
+            <button
+              v-for="label in COPING_CHIPS"
+              :key="label"
+              type="button"
+              class="mia-chip"
+              :class="{ 'is-active': form.coping.includes(label) }"
+              @click="toggleCoping(label)"
+            >
+              {{ label }}
+            </button>
+          </div>
+          <label class="form__label">结果</label>
+          <input
+            v-model="form.outcome"
+            class="mia-input"
+            type="text"
+            placeholder="后来怎样了"
+          />
+        </template>
+        <EventMediaAttach v-model:photo-id="form.photoId" />
       </div>
 
       <div class="form__actions">
@@ -559,6 +607,49 @@ onUnmounted(() => {
 .quote-cta small {
   color: var(--c-ink-2);
   font-size: var(--fs-xs);
+}
+
+.daily-quote {
+  width: 100%;
+  display: block;
+  margin-bottom: 16px;
+  padding: 16px 18px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  background: var(--c-grape-soft);
+  border-color: var(--c-grape);
+  transition:
+    transform var(--dur) var(--ease-bounce),
+    box-shadow var(--dur) var(--ease-bounce);
+}
+
+.daily-quote:hover {
+  transform: translate(-1px, -2px);
+  box-shadow: var(--shadow-pop);
+}
+
+.daily-quote__eyebrow {
+  margin: 0 0 8px;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--c-grape);
+  letter-spacing: 0.02em;
+}
+
+.daily-quote__content {
+  margin: 0 0 6px;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--c-ink);
+  line-height: 1.45;
+}
+
+.daily-quote__meta {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--c-ink-2);
 }
 
 .mobile-only {

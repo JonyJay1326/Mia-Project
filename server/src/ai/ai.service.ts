@@ -8,6 +8,7 @@ import { DbService } from '../db/db.service'
 import { SkillsService } from '../skills/skills.service'
 import { mapEventRow, mapQuoteRow } from '../utils/mappers'
 import type { EventRow, QuoteRow } from '../types/event'
+import { AiChatStore } from './ai-chat.store'
 import { loadAiConfig, readArchiveText } from './ai.config'
 
 /** 对话消息 */
@@ -22,6 +23,10 @@ export interface ChatRequest {
   /** 是否附带近期崩溃统计（默认 true） */
   includeStats?: boolean
   days?: number
+  /** 已有会话 id；空则首轮成功后新建 */
+  chatId?: string
+  /** 是否写入历史（默认 true；一键解读可关） */
+  persist?: boolean
 }
 
 /** 一键解读请求 */
@@ -36,6 +41,7 @@ export class AiService {
     private readonly dbService: DbService,
     private readonly analyticsService: AnalyticsService,
     private readonly skillsService: SkillsService,
+    private readonly chatStore: AiChatStore,
   ) {}
 
   /** 当前配置是否可用 */
@@ -54,9 +60,11 @@ export class AiService {
   }
 
   /**
-   * 多轮咨询：系统提示 = 档案规则 + 事实摘要
+   * 多轮咨询：系统提示 = 档案规则 + 事实摘要；成功后写入会话历史
    */
-  async chat(body: ChatRequest): Promise<{ reply: string; model: string }> {
+  async chat(
+    body: ChatRequest,
+  ): Promise<{ reply: string; model: string; chatId?: string }> {
     const cfg = loadAiConfig()
     if (!cfg.enabled) {
       throw new ServiceUnavailableException(
@@ -78,7 +86,32 @@ export class AiService {
       ...messages,
     ])
 
-    return { reply, model: cfg.model }
+    if (body.persist === false) {
+      return { reply, model: cfg.model }
+    }
+
+    const fullMessages = [
+      ...messages.filter((m) => m.role === 'user' || m.role === 'assistant'),
+      { role: 'assistant' as const, content: reply },
+    ]
+    const saved = this.chatStore.save(body.chatId, fullMessages)
+
+    return { reply, model: cfg.model, chatId: saved.chatId }
+  }
+
+  /** 会话列表 */
+  listChats(limit?: number) {
+    return this.chatStore.list(limit)
+  }
+
+  /** 会话详情 */
+  getChat(id: string) {
+    return this.chatStore.get(id)
+  }
+
+  /** 删除会话 */
+  removeChat(id: string) {
+    return this.chatStore.remove(id)
   }
 
   /**
@@ -97,6 +130,7 @@ export class AiService {
     return this.chat({
       days,
       includeStats: true,
+      persist: false,
       messages: [
         {
           role: 'user',
@@ -151,7 +185,7 @@ export class AiService {
     ].join('\n')
   }
 
-  /** 拼装统计 + 近期事件/语录/技能摘要 */
+  /** 拼装统计 + 近期事件 / 近30天情绪 / 语录 / 技能摘要 */
   private buildFactsBlock(days: number): string {
     const stats = this.analyticsService.getMeltdownAnalytics(days)
     const lines: string[] = []
@@ -175,9 +209,6 @@ export class AiService {
       `地点：${formatTop(stats.byLocation.map((x) => `${x.label}×${x.count}`))}`,
     )
     lines.push(
-      `照护人：${formatTop(stats.byCaregiver.map((x) => `${x.label}×${x.count}`))}`,
-    )
-    lines.push(
       `应对：${formatTop(stats.byCoping.map((x) => `${x.key}×${x.count}`))}`,
     )
     lines.push(
@@ -198,6 +229,31 @@ export class AiService {
       lines.push(
         `- [${ev.type}] ${ev.happenedAt} ${ev.summary || '（无摘要）'} chips=${(ev.chips ?? []).join('|') || '—'}`,
       )
+    }
+
+    // 情绪观察单独拉近 30 天，便于咨询侧看情绪走势（与上面「近期 12 条」并存）
+    const emotionSince = new Date()
+    emotionSince.setDate(emotionSince.getDate() - 30)
+    const emotionRows = this.dbService.db
+      .prepare(
+        `SELECT * FROM events
+         WHERE type = 'emotion' AND happened_at >= ?
+         ORDER BY happened_at DESC
+         LIMIT 40`,
+      )
+      .all(emotionSince.toISOString()) as EventRow[]
+    lines.push(
+      `近 30 天情绪事件（${emotionRows.length} 条，最多 40）：`,
+    )
+    if (!emotionRows.length) {
+      lines.push('- （无）')
+    } else {
+      for (const row of emotionRows) {
+        const ev = mapEventRow(row)
+        lines.push(
+          `- ${ev.happenedAt} ${ev.summary || '（无摘要）'} chips=${(ev.chips ?? []).join('|') || '—'}`,
+        )
+      }
     }
 
     const quotes = this.dbService.db

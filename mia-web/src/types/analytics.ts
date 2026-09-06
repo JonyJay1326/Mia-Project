@@ -38,9 +38,7 @@ export interface MeltdownAnalytics {
   byChip: CountItem[]
   byTrigger: CountItem[]
   byLocation: CountItem[]
-  byCaregiver: CountItem[]
   byCoping: CopingItem[]
   byNapped: NappedCompare
   byHour: CountItem[]
-  byWeekday: CountItem[]
 }

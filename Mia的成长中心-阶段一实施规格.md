@@ -1,31 +1,40 @@
-# Mia 的成长中心 · 阶段一实施规格
+# Mia 的成长中心 · 实施规格（总册）
 
 > 交付对象：Cursor。这份文档要能达到「照着做就能跑起来」的程度。  
-> 阶段一范围：**记录 + 时间线**。不做分析、相册、AI、技能地图。
+> 文件名仍带「阶段一」，但正文已覆盖阶段二/三落地结果；任务勾选以 `.cursor/rules/40|45|46|47|48` 为准。  
+> **修订（2026-09-01）**：事件类型拆分、场景卡 v3、分析砍记录人/按星期、AI 咨询历史、可选应用内登录等已与代码对齐。
 
 ## 0. 目标与边界
 
-**做的：**
+**已交付（阶段一～三）：**
 
 - 电脑端为主的信息浏览（侧边栏 + 时间线）
 - 手机端 10 秒完成一条事件记录
 - **渺言妙语：记录她说的话，按月龄分组展示**
 - **请求失败时存本地，联网自动补交**（草稿队列，不依赖 Service Worker）
+- 崩溃统计分析 `/analysis`（自绘条形图 + 可选 AI 解读）
+- 相册 `/album`、技能地图 `/skills`、AI 咨询 `/consult`（DeepSeek + Mia 档案）
 
-**不做的（阶段一明确排除，别提前设计）：**
+**仍不做 / 后置：**
 
-- 崩溃分析图表、AI 咨询、相册、技能地图
-- 登录体系 —— 改用 **Nginx Basic Auth**（见 8.2），不做应用内登录
-- 语录的搜索 / 标签 / 导出（等攒够量、确认会用了再加）
+- 语录的搜索 / 标签 / 导出（搜索已实现；标签与导出等攒够量再加）
+- **Service Worker** —— 无域名无 HTTPS，见 7.1；IndexedDB 草稿队列照做
+- 技能备注编辑 UI、删除自定义技能 API/UI（`PATCH .../note`、`DELETE /api/skills/:id`）
+- 常模诊断、倒退预警、判断写回 events/quotes
 
-**⚠️ 阶段一能力缺口（用户决策：不用域名，IP + HTTP 先跑）：**
+**鉴权：**
+
+- **Nginx Basic Auth 仍是公网挡扫描的主手段**（见 8.2）
+- **可选**应用内登录：配 `MIA_AUTH_USERNAME` / `MIA_AUTH_PASSWORD` / `MIA_AUTH_SECRET` 后启用 Bearer；未配则关闭
+
+**⚠️ 能力缺口（用户决策：不用域名，IP + HTTP 先跑）：**
 
 - **不做 Service Worker** → 断网时页面打不开 → 「断网也能记」能力暂缺
 - 原因：Service Worker 强制要求 HTTPS，HTTPS 需要域名，Let's Encrypt 不给裸 IP 签证书
 - 影响不大：手机在户外基本都有 4G/5G，真正断网场景少。等买了域名再补（T18/T19）
 - 详见 7.1 节
 
-**为什么先做这个：** 系统可以慢慢长，记录习惯得从第一条开始。第一步不做窄，后面全白搭。
+**为什么先做记录：** 系统可以慢慢长，记录习惯得从第一条开始。第一步不做窄，后面全白搭。
 
 ---
 
@@ -104,21 +113,20 @@ bootstrap()
 ┌──────────────┬────────────────────────────────┐
 │  侧边栏       │  主内容区                        │
 │              │                                │
-│  ⚡ 快速记录  │   2026-08-31  周日 · 2岁3个月    │
+│  ⚡ 快速记录  │   2026-09-01  周二 · 2岁3个月    │
 │  💬 渺言妙语  │   ┌──────────────────────────┐ │
-│              │   │ 05:50  健康               │ │
-│  📅 时间线    │   │ 早醒要喝奶，说肚子不舒服   │ │
-│              │   └──────────────────────────┘ │
-│  📷 相册      │   ┌──────────────────────────┐ │
-│   （阶段三）  │   │ 10:00  崩溃  ●●●○○        │ │
+│  📅 时间线    │   │ 05:50  睡眠              │ │
+│  📷 相册      │   │ 早醒要喝奶               │ │
+│  🌱 技能      │   └──────────────────────────┘ │
+│  📊 分析      │   ┌──────────────────────────┐ │
+│  🤖 AI 咨询   │   │ 10:00  崩溃  ●●●○○        │ │
 │              │   │ 商场要买糖被拒 · 15分钟   │ │
-│  📊 分析      │   └──────────────────────────┘ │
-│   （阶段二）  │                                │
+│              │   └──────────────────────────┘ │
 └──────────────┴────────────────────────────────┘
 ```
 
-> **阶段二进度（2026-08-31）**：已上线崩溃纯统计页 `/analysis` + `GET /api/analytics/meltdown`。  
-> 无 AI、自绘条形图；**n&lt;5 不下结论**。相册仍属阶段三。
+> **进度（2026-09-01）**：阶段二分析 `/analysis`（自绘条形图 +「生成解读」）；阶段三相册 / 技能 / AI 咨询均已上线。  
+> 统计仍 **n&lt;5 不下结论**；AI 判断不写回 events/quotes。
 
 - 侧边栏常驻导航，「快速记录」放最上面（随时可用）
 - 内容区宽度上限约 900 px，超过则居中（别让文字拉太长）
@@ -136,7 +144,7 @@ bootstrap()
 │  └──────────────┘  │
 │                    │
 │  最近记录           │
-│  ├ 05:50 健康       │
+│  ├ 05:50 睡眠       │
 │  └ 昨天 崩溃 ×2     │
 └────────────────────┘
 ```
@@ -269,14 +277,21 @@ Element Plus 用 CSS 变量，覆写即可全局生效：
 
 ### 事件类型配色（时间线用）
 
-| 类型            | 主色（描边/图标）     | 浅底（卡片背景）    | 图标 |
-| ------------- | ------------- | ----------- | -- |
-| `meltdown` 崩溃 | `#E8736B` 珊瑚红 | `#FADBD8`   | 🍭 |
-| `skill` 新技能   | `#7FC8A9` 薄荷绿 | `#D6EFE3`   | 🌱 |
-| `health` 健康   | `#6BA3D6` 天空蓝 | `#DCEAF5`   | 🌙 |
-| `question` 想问 | `#F5C45E` 蜜糖黄 | `#FBF0D6`   | ❓  |
-| `quote` 语录    | `#A98BC4` 葡萄紫 | `#EDE5F3`   | 💬 |
+| 类型 | 主色（描边/图标） | 浅底（卡片背景） | 图标 |
+| --- | --- | --- | -- |
+| `meltdown` 崩溃 | `#E8736B` 珊瑚红 | `#FADBD8` | 🍭 |
+| `skill` 技能 | `#7FC8A9` 薄荷绿 | `#D6EFE3` | 🌱 |
+| `daily` 日常 | `#C4A574` 暖褐 | `#F3EADC` | 📒 |
+| `emotion` 情绪 | `#E8A87C` 杏橙 | `#F8E6D8` | 🫧 |
+| `highlight` 高光时刻 | `#E8B84A` 蜜金 | `#FBF0D6` | ✨ |
+| `diet` 吃喝拉撒睡 | `#D4896A` 陶土 | `#F5E0D6` | 🥣 |
+| `social` 社交 | `#7EB8B2` 青绿 | `#DCEEED` | 👋 |
+| `medical` 医疗 | `#6B8FD6` 雾蓝 | `#DDE6F5` | 💊 |
+| `quote` 语录 | `#A98BC4` 葡萄紫 | `#EDE5F3` | 💬 |
 
+历史只读（不可新建）：`sleep` 睡眠、`health` 健康、`question` 想问。
+
+> **Legacy（仅兼容旧数据展示，不可新建）**：`sleep` / `health` / `question`。  
 > **用 emoji 而不是 Element Plus 的线性图标。** Element Plus 图标是细描边线性风格，偏商务；emoji 饱满有笔触感，跟糖果风一致，且零成本。
 
 ### 组件级要求
@@ -381,7 +396,14 @@ mia-center/                     # 仓库根
 │       ├── views/
 │       │   ├── Record.vue      # 录入页（首页）
 │       │   ├── Timeline.vue    # 时间线
-│       │   └── Quotes.vue      # 渺言妙语
+│       │   ├── Quotes.vue      # 渺言妙语
+│       │   ├── Analysis.vue    # 崩溃分析
+│       │   ├── Album.vue       # 相册
+│       │   ├── Skills.vue      # 技能地图
+│       │   └── Consult.vue     # AI 咨询
+│       ├── config/
+│       │   ├── scenes.ts       # 场景卡 v3（mia-scenes-v3）
+│       │   └── chips.ts
 │       ├── components/
 │       │   ├── SceneCards.vue  # 场景快捷卡片
 │       │   ├── ChipGroup.vue   # 短语 chips
@@ -399,21 +421,22 @@ mia-center/                     # 仓库根
 │       ├── assets/sprite/      # 精灵素材（_source.png + 切出的 4 张）
 │       └── utils/
 │           ├── idb.ts          # IndexedDB 小封装
+│           ├── typeChip.ts     # 类型配色
 │           └── date.ts         # 月龄计算等
 ├── server/                     # 后端 NestJS
 │   └── src/
-│       ├── main.ts             # ⭐ NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter())
+│       ├── main.ts             # NestFactory + FastifyAdapter
 │       ├── app.module.ts
 │       ├── db/
-│       │   └── db.service.ts   # better-sqlite3 封装
+│       │   ├── schema.sql
+│       │   └── db.service.ts
 │       ├── events/
-│       │   ├── events.controller.ts
-│       │   ├── events.service.ts
-│       │   └── events.module.ts
-│       └── quotes/
-│           ├── quotes.controller.ts
-│           ├── quotes.service.ts
-│           └── quotes.module.ts
+│       ├── quotes/
+│       ├── analytics/
+│       ├── photos/
+│       ├── skills/
+│       ├── ai/                 # 含 ai-chat.store
+│       └── auth/
 ├── server/data/mia.db
 └── deploy/
 ```
@@ -422,20 +445,23 @@ mia-center/                     # 仓库根
 
 ## 3. 数据库 Schema
 
+权威源：`server/src/db/schema.sql`（启动时 `CREATE TABLE IF NOT EXISTS`）。
+
 ```sql
 CREATE TABLE events (
   id            TEXT PRIMARY KEY,      -- uuid，客户端生成（离线也要能建）
   happened_at   TEXT NOT NULL,         -- ISO 字符串，事件发生时间
-  type          TEXT NOT NULL,         -- meltdown | skill | health | question（语录单独建表，见 4.6.2）
+  type          TEXT NOT NULL,         -- meltdown | skill | daily | emotion | diet | social | medical | highlight（历史：sleep|health|question）
+                                       -- 历史兼容：health | question（不可新建）；语录见 quotes 表
   summary       TEXT,                  -- 一句话（chips 选的或手输）
   chips         TEXT,                  -- JSON 数组，存原始 chip 值
-  location      TEXT,                  -- home | outdoor | mall | grandparents | other
-  trigger       TEXT,                  -- 触发：refused | interrupted | order | dressed | food | share | unknown
+  location      TEXT,                  -- home | outdoor | mall | grandparents | taoshudi | tongtong | school | other
+  trigger       TEXT,                  -- refused | interrupted | order | dressed | food | share | bedtime | unknown
   intensity     INTEGER,               -- 1–5，仅崩溃类
   duration_min  INTEGER,               -- 崩溃时长（分钟），可空
   coping        TEXT,                  -- JSON 数组，应对方式
   outcome       TEXT,                  -- 结果（自由文本，可后补）
-  caregiver     TEXT,                  -- 在场照护人：mom | dad | grandma | grandpa
+  caregiver     TEXT,                  -- 记录人：mom | dad | grandma | grandpa（录入仅 mom/dad；爷奶只读兼容）
   napped        INTEGER,               -- 当日是否午睡：0 | 1 | NULL（Mia 特有，验证睡眠假设）
   month_age     INTEGER,               -- 冗余字段，便于按月龄查询
   created_at    TEXT NOT NULL,
@@ -448,13 +474,62 @@ CREATE INDEX idx_events_type ON events(type);
 
 **设计说明：**
 
-- **`id` 由客户端生成**（`crypto.randomUUID()`）—— 离线状态下也要能建记录，不能依赖数据库自增
+- **`id` 由客户端生成**（`createId()`，兼容 HTTP 非 localhost；优先 `crypto.randomUUID`）—— 离线状态下也要能建记录，不能依赖数据库自增
 - **`napped` 是 Mia 专用字段**。档案显示她午睡不规律，这个字段用来对比"睡了 vs 没睡"两天的情绪差异
 - **`month_age` 冗余但值得**。Mia 出生日期 2024-05-17，写入时算好，查询时省事
 - **崩溃详情字段（intensity/duration/coping/outcome）全部可空**，支持"先提交，后补详情"
 - **`type` 里没有 `quote`** —— 语录（渺言妙语）单独建 `quotes` 表，**见 4.6.2 节，别漏掉**
 
-> 阶段一共两张表：`events`（事件）+ `quotes`（语录）
+### 3.1 其它表（阶段二/三）
+
+```sql
+-- quotes：见 4.6.2
+
+CREATE TABLE photos (
+  id TEXT PRIMARY KEY,
+  taken_at TEXT NOT NULL,
+  uploaded_at TEXT NOT NULL,
+  original_name TEXT,
+  mime TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL,
+  width INTEGER,
+  height INTEGER,
+  month_age INTEGER,
+  note TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE skills (
+  id TEXT PRIMARY KEY,
+  domain TEXT NOT NULL,
+  label TEXT NOT NULL,
+  emoji TEXT,
+  typical_from INTEGER,
+  typical_to INTEGER,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_custom INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT
+);
+
+CREATE TABLE skill_marks (
+  skill_id TEXT PRIMARY KEY,
+  status TEXT NOT NULL,           -- emerging | done（无行 = todo 未观察）
+  marked_at TEXT NOT NULL,
+  note TEXT,
+  updated_at TEXT,
+  FOREIGN KEY (skill_id) REFERENCES skills(id)
+);
+
+CREATE TABLE ai_chats (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  messages TEXT NOT NULL,          -- JSON：[{ role, content }, ...]
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+```
+
+> 当前库表：`events` + `quotes` + `photos` + `skills` + `skill_marks` + `ai_chats`。
 
 **初始化方式（T2 做这个）：**
 
@@ -492,10 +567,10 @@ export class DbService {
 ### 4.1 页面流程
 
 ```
-打开 → 8 张场景卡片（不是空表单！）
+打开 → 8 张场景卡片（崩溃一张总卡 + 各类型入口，不是空表单！）
      ↓ 点一张卡片
-     → 字段已预填 3–4 个
-     → 只剩「选一句话 chips」+「确认记录人」
+     → 默认只预填 type（细节靠 chips；自定义卡可预填更多）
+     → 选一句话 chips + 确认记录人（爸/妈）
      ↓ 点「保存」
      → 立即返回首页，显示"已记录"
      → 详情页可稍后补（不阻塞）
@@ -506,67 +581,88 @@ export class DbService {
 ### 4.2 场景卡片定义
 
 ```ts
-// src/config/scenes.ts
+// mia-web/src/config/scenes.ts
 export interface Scene {
   id: string
   label: string
-  icon: string          // Element Plus 图标组件名（从 @element-plus/icons-vue 引入）
-  preset: Partial<EventDraft>
-  order: number         // 用于排序，会按使用频次自动调整
+  icon: string          // emoji 字符串（不用 Element Plus 图标名）
+  preset: { type: EventType; location?: LocationType; trigger?: TriggerType; caregiver?: CaregiverType }
+  order: number
+  count: number         // 使用次数，本地持久化后参与排序
+  custom?: boolean
 }
 
+/** 本地持久化键：mia-scenes-v3（崩溃收成单卡） */
 export const DEFAULT_SCENES: Scene[] = [
-  // —— 崩溃类（来自 Mia 档案已知的高发场景）——
-  { id: 'mall-want',   label: '商场要买',   icon: 'ShoppingCart',
-    preset: { type: 'meltdown', location: 'mall',  trigger: 'refused' } },
-  { id: 'no-gohome',   label: '不想回家',   icon: 'LocationInformation',
-    preset: { type: 'meltdown', location: 'outdoor', trigger: 'interrupted' } },
-  { id: 'order-broken',label: '顺序被打乱', icon: 'Sort',
-    preset: { type: 'meltdown', trigger: 'order' } },
-  { id: 'dress-food',  label: '吃饭穿衣',   icon: 'Food',
-    preset: { type: 'meltdown', trigger: 'dressed' } },
-
-  // —— 非崩溃类 ——
-  { id: 'sleep-fight', label: '睡前闹',     icon: 'Moon',
-    preset: { type: 'meltdown', location: 'home', trigger: 'bedtime' } },
-  { id: 'new-skill',   label: '新技能',     icon: 'Medal',
-    preset: { type: 'skill' } },
-  { id: 'health',      label: '身体',       icon: 'FirstAidKit',
-    preset: { type: 'health' } },
-  { id: 'question',    label: '想问',       icon: 'QuestionFilled',
-    preset: { type: 'question' } },
+  { id: 'meltdown',  label: '崩溃',       icon: '🍭', preset: { type: 'meltdown' },  order: 1, count: 0 },
+  { id: 'highlight', label: '高光时刻',   icon: '✨', preset: { type: 'highlight' }, order: 2, count: 0 },
+  { id: 'new-skill', label: '新技能',     icon: '🌱', preset: { type: 'skill' },     order: 3, count: 0 },
+  { id: 'daily',     label: '日常点滴',   icon: '📒', preset: { type: 'daily' },     order: 4, count: 0 },
+  { id: 'emotion',   label: '情绪观察',   icon: '🫧', preset: { type: 'emotion' },   order: 5, count: 0 },
+  { id: 'diet',      label: '吃喝拉撒睡', icon: '🥣', preset: { type: 'diet' },      order: 6, count: 0 },
+  { id: 'social',    label: '社交分离',   icon: '👋', preset: { type: 'social' },    order: 7, count: 0 },
+  { id: 'medical',   label: '医疗',       icon: '💊', preset: { type: 'medical' },   order: 8, count: 0 },
 ]
 ```
 
-> ⚠️ **卡片必须可增删、可改预填内容、可拖拽排序。**&#x8FD9; 8 张是基于 Mia 档案的初始猜测，是起点不是定论。  
-> 排序按使用频次自动调整（纯计数，不用 AI）：每次使用 `count++`，展示时按 count 降序。
+> ⚠️ **卡片必须可增删、可改预填内容、可拖拽排序。** 8 张是类型入口，细节靠 chips，是起点不是定论。  
+> 排序：有用户拖拽顺序则优先；否则按使用 `count` 降序。  
+> 自定义场景可调 `POST /api/ai/scene-suggest` 预览 emoji + 事件类型（不写库；类型可手改）。
 
-**卡片里的「好玩的话」已移除** —— 语录走独立的渺言妙语模块（4.6 节），有专属入口和录入页，不混在场景卡片里。  
-空出的位置给了「睡前闹」（档案显示 Mia 哄睡时容易兴奋、入睡费劲，是每天都会发生的高频场景）。
-
-> 需要同步在 `trigger` 枚举里加 `bedtime`。
+**语录不进场景卡** —— 走独立渺言妙语模块（4.6 节）。  
+`trigger` 已含 `bedtime`（睡前）。
 
 ### 4.3 Chips 定义（按类型切换）
 
 ```ts
-// src/config/chips.ts
+// mia-web/src/config/chips.ts
 export const CHIPS_BY_TYPE: Record<EventType, string[]> = {
   meltdown: [
-    '要买糖/玩具被拒', '不想走，还想玩', '没按她的顺序来',
-    '不肯穿这件衣服', '不肯吃饭', '和小朋友抢玩具', '要抱抱', '不明原因',
+    '要买糖/玩具被拒', '不想走，还想玩', '该回家了还不走',
+    '没按她的顺序来', '不肯穿这件衣服', '不肯吃饭',
+    '不想洗澡/洗手', '不给看手机/iPad', '毯子/安抚物找不到',
+    '要妈妈不要别人', '和小朋友抢玩具', '突然换计划',
+    '要抱抱', '累了还不自知', '不明原因',
   ],
   skill:   ['自己完成了一件事', '说了新词/新句子', '解锁新动作'],
-  health:  ['肚子不舒服', '睡不好/早醒', '吃饭不好'],
-  question:[],
+  daily:   ['今天发生的一件小事', '自己做了…', '出门玩了', '和家人在一起'],
+  emotion: ['特别开心', '有点害羞', '很黏人', '突然不高兴', '情绪来得很快'],
+  highlight: [
+    '第一次做到了', '特别暖心的瞬间', '笑到停不下来', '突然懂事了',
+    '令人骄傲的表现', '玩得很投入', '和家人甜蜜互动', '今日最佳表情',
+    '小小成就感', '意外惊喜',
+  ],
+  diet: [
+    '吃得好', '挑食/拒食', '要喝奶', '肚子不舒服', '零食相关',
+    '拉臭臭成功', '试图拉但没成', '拉在裤子上', '不肯坐盆/马桶',
+    '早醒', '入睡困难', '夜醒', '午睡不好/没午睡', '睡前折腾', '睡得香',
+  ],
+  social:  ['见人热情/认生', '分离焦虑', '和小朋友互动', '上幼儿园相关'],
+  medical: ['发烧/看病', '疫苗', '吃药', '过敏/皮疹', '体检'],
 }
 
 // ⚠️ 没有 quote —— 语录走独立的渺言妙语模块（见 4.6），不用 chips 概括
-// 原因：语录的价值在于原话本身，用 chip 归类等于加工，违背设计原则
 
-// 应对方式（崩溃类，用于事后统计"什么管用"）
 export const COPING_CHIPS = [
   '抱抱/安抚物', '提前预告', '给两个选项',
-  '转移注意力（唱歌）', '冷处理等着', '讲道理', '没管用',
+  '转移注意力', '冷处理等着', '讲道理', '没管用',
+]
+
+export const LOCATION_CHIPS = [
+  { value: 'home', label: '家里' },
+  { value: 'outdoor', label: '户外' },
+  { value: 'mall', label: '商场' },
+  { value: 'grandparents', label: '爷奶家' },
+  { value: 'taoshudi', label: '桃树地' },
+  { value: 'tongtong', label: '彤彤姐家' },
+  { value: 'school', label: '学校' },
+  { value: 'other', label: '其他' },
+]
+
+export const CAREGIVER_CHIPS = [
+  { value: 'mom', label: '妈妈' },
+  { value: 'dad', label: '爸爸' },
+  // grandma / grandpa 仅兼容旧数据展示，录入不提供
 ]
 ```
 
@@ -581,13 +677,13 @@ export const COPING_CHIPS = [
 | `location`                              | —    | 卡片预填，否则记住上次 | chip 单选                        |
 | `trigger`                               | —    | 卡片预填        | chip 单选                        |
 | `summary`                               | ✅    | —           | **chips 为主，允许手输**（输入框在下方，不抢焦点） |
-| `caregiver`                             | ✅    | **记住上次**    | chip 单选                        |
+| `caregiver`                             | ✅    | **记住上次（仅爸妈）** | chip 单选                        |
 | `napped`                                | —    | 空           | 是/否/不清楚                        |
 | intensity / duration / coping / outcome | —    | 空           | **折叠在「补充详情」里，默认收起**            |
 
 **两条关键的默认值设计：**
 
-1. **记录人记住上次** —— 工作日默认爷爷奶奶，周末默认爸妈，减少一次点击
+1. **记录人记住上次** —— 仅 `mom` / `dad`；旧 prefs 若是爷奶则回退为妈妈
 2. **崩溃详情延后补** —— 孩子在哭的时候不可能填 8 个字段。先存主记录，详情回头补
 
 ### 4.5 离线队列（不能省）
@@ -738,9 +834,19 @@ CREATE INDEX idx_quotes_month ON quotes(month_age DESC, said_at DESC);
 - 有 `photo_id` 的（阶段三），卡片顶部配图
 - 右下角显示日期（小字）
 
-#### 首页「今日一条」（可选，语录取到 20 条后再做）
+#### 首页「今日一条」（≥20 条后显示）
 
-每天打开首页随机显示一条历史语录，带一点仪式感。数据少的时候每天都是同一条，反而尴尬，所以等攒够再做。
+每天打开快速记录页展示一条历史语录（东八区按日稳定选取，同一天内不变）。不足 20 条时不显示。
+
+**接口：** `GET /api/quotes?daily=1` → `QuoteRecord | null`
+
+#### 搜索
+
+语录墙顶栏模糊搜索原话 / 上下文 / 感受：`GET /api/quotes?q=关键词` → 扁平列表。
+
+#### 编辑
+
+`PATCH /api/quotes/:id` 可改 `context` / `note` / `saidAt`（原话 `content` 前端只读展示）。语录墙与时间线抽屉均有「编辑 / 补详情」入口。
 
 ### 4.6.5 跟其他模块的关系
 
@@ -749,9 +855,9 @@ CREATE INDEX idx_quotes_month ON quotes(month_age DESC, said_at DESC);
 | **时间线**      | 语录也出现在总时间线里（`type` 显示为「语录」），点进去跳语录详情 |
 | **相册（阶段三）**  | 按 `said_at` ±30 分钟匹配照片，自动配图          |
 | **将来：导出成册**  | 数据模型已支持，将来能做「渺言妙语」纪念册 PDF            |
-| **将来：AI 分析** | 攒够一定量后，AI 能分析她的语言发展轨迹、认知跃迁节点         |
+| **AI 咨询** | 可结合语录事实回答；判断不写回 quotes                     |
 
-> **先做窄**：第一版只要「录入 + 按月龄展示」。搜索、标签、导出都等用起来再说。
+> **标签 / 导出成册** 仍后置；搜索、编辑、今日一句已落地。
 
 ---
 
@@ -763,75 +869,80 @@ CREATE INDEX idx_quotes_month ON quotes(month_age DESC, said_at DESC);
 
 ```
 ┌────────────┬─────────────────────────────────────┐
-│ 月份导航    │  2026-08-31  周日 · 2 岁 3 个月        │
+│ 月份导航    │  2026-09-01  周二 · 2 岁 3 个月        │
 │            │  ┌───────────────────────────────┐  │
-│ 2026-08 ▾  │  │ ● 健康   05:50                 │  │
-│  08-31     │  │   早醒要喝奶，说肚子不舒服       │  │
-│  08-30 (3) │  │   照护：妈妈 · 午睡：—          │  │
-│  08-29 (1) │  └───────────────────────────────┘  │
-│  08-28 (2) │  ┌───────────────────────────────┐  │
+│ 2026-09 ▾  │  │ ● 睡眠   05:50                 │  │
+│  09-01     │  │   早醒要喝奶                     │  │
+│  08-31 (3) │  │   记录人：妈妈 · 午睡：—          │  │
+│  08-30 (1) │  └───────────────────────────────┘  │
+│  08-29 (2) │  ┌───────────────────────────────┐  │
 │            │  │ ● 崩溃   10:00  ●●●○○  15min   │  │
-│ 2026-07 ▸  │  │   商场要买糖被拒                │  │
+│ 2026-08 ▸  │  │   商场要买糖被拒                │  │
 │            │  │   触发：要求被拒 · 应对：抱抱    │  │
 │            │  └───────────────────────────────┘  │
 └────────────┴─────────────────────────────────────┘
 ```
 
 - **左侧月份导航**：按月折叠，每天显示条目数。方便快速跳到某一天
-- **右侧事件流**：按天分组，每条显示类型、时间、摘要 + 关键字段（照护人、午睡、触发、应对）
-- **详情用右侧抽屉**，不跳页——保持时间线上下文，看完关掉继续浏览
+- **右侧事件流**：按天分组，每条显示类型、时间、摘要 + 关键字段（记录人、午睡、触发、应对）
+- **详情用右侧抽屉**，不跳页——保持时间线上下文，看完关掉继续浏览；条目可删除
 
 ### 5.2 交互要点
 
 | 要点  | 做法                                   |
 | --- | ------------------------------------ |
 | 分页  | 每次加载 50 条，滚动到底自动加载（先不做虚拟滚动，几千条内没必要）  |
-| 筛选  | 顶部按类型筛选（全部 / 崩溃 / 语录 / 技能 / 健康 / 疑问） |
-| 补录  | 顶部「补录」按钮，默认时间可改（补昨天的事是高频场景）          |
+| 筛选  | 顶部按类型：全部 / 崩溃 / 语录 / 高光 / 技能 / 日常 / 情绪 / 吃喝拉撒睡 / 社交 / 医疗 |
+| 补录  | 顶部「补录」或快捷键 `B`，默认时间可改（补昨天的事是高频场景）          |
 | 编辑  | 点条目 → 右侧抽屉，可改可删可补详情                  |
 | 空状态 | 没记录时引导去录入，别显示一片空白                    |
 
 ### 5.2.1 键盘快捷键（电脑端）
 
-| 键                    | 作用                   |
-| -------------------- | -------------------- |
-| `N`                  | 新建记录（打开右侧抽屉）         |
-| `Q`                  | 记语录（打开渺言妙语，光标自动在输入框） |
-| `C`                  | 补录（同 N，但时间默认可改）      |
-| `Esc`                | 关闭抽屉 / 取消当前操作        |
-| `Ctrl/Cmd + Enter`   | 保存当前编辑               |
-| `J` / `K`（或 `↑` `↓`） | 在时间线里上下移动选中项         |
-| `Enter`              | 打开选中项详情              |
-| `E`                  | 编辑选中项                |
-| `?`                  | 显示快捷键帮助面板            |
+| 键 | 作用 |
+| --- | --- |
+| `N` | 快速记录 |
+| `B` | 补录（时间默认可改） |
+| `Q` | 记语录 |
+| `T` | 时间线 |
+| `A` | 分析 |
+| `P` | 相册 |
+| `S` | 技能 |
+| `I` | AI 咨询 |
+| `Esc` | 关闭帮助等 |
+| `Ctrl/Cmd + Enter` | 保存当前编辑（录入/咨询发送等） |
+| `?` | 显示快捷键帮助面板 |
 
 **实现要点：**
 
-- 用一个 `useHotkeys` composable 统一注册，在抽屉打开时屏蔽列表快捷键（避免冲突）
-- **输入框聚焦时不触发单键快捷键**（`N`/`E` 这类），判断 `document.activeElement` 是否是 input/textarea
-- 选中项用 Pinia 存 `selectedId`，`J`/`K` 移动时同步滚动到可视区
-- `?` 的帮助面板用 `el-dialog`，别做成独立页面
+- 用 `useHotkeys` composable 统一注册
+- **输入框聚焦时不触发单键快捷键**；带 Ctrl/Meta/Alt 时不抢系统快捷键
+- `?` 的帮助面板用对话框，别做成独立页面
 
-> 阶段一先做 `N` / `Q` / `Esc` / `Ctrl+Enter` / `?` 五个就够用，其余等实际用起来再加。  
 > `Q` 键值得单独给——她说完一句话的瞬间，从掏手机到记下来只有十几秒窗口。
 
 ### 5.3 手机端降级
 
 - 左侧月份导航收起，改成顶部的月份下拉
-- 每条事件只显示：类型 + 时间 + 摘要（隐藏照护人/午睡等次要字段）
+- 每条事件只显示：类型 + 时间 + 摘要（隐藏记录人/午睡等次要字段）
 - 详情改成全屏页（手机没有抽屉的空间）
 
 ### 5.4 类型配色
 
-> ⚠️ **配色见 1.2 节，用「柔和糖果」降饱和四色。下面这张表的 Element Plus 默认色已废弃。**
+> ⚠️ **配色见 1.2 节，与 `mia-web/src/utils/typeChip.ts` 一致。**
 
-| 类型            | 主色（描边/文字）    | 浅底（卡片背景）    | 图标 |
-| ------------- | ------------ | ----------- | -- |
-| `meltdown` 崩溃 | `#E8736B` 珊瑚红 | `#FADBD8`   | 🍭 |
-| `skill` 技能    | `#7FC8A9` 薄荷绿 | `#D6EFE3`   | 🌱 |
-| `health` 健康   | `#6BA3D6` 天空蓝 | `#DCEAF5`   | 🌙 |
-| `question` 疑问 | `#F5C45E` 蜜糖黄 | `#FBF0D6`   | ❓  |
-| **quote 语录**  | `#A98BC4` 葡萄紫 | `#EDE5F3`   | 💬 |
+| 类型 | 主色 | 浅底 | 图标 |
+| --- | --- | --- | -- |
+| `meltdown` 崩溃 | `#E8736B` | `#FADBD8` | 🍭 |
+| `highlight` 高光 | `#E8B84A` | `#FBF0D6` | ✨ |
+| `skill` 技能 | `#7FC8A9` | `#D6EFE3` | 🌱 |
+| `daily` 日常 | `#C4A574` | `#F3EADC` | 📒 |
+| `emotion` 情绪 | `#E8A87C` | `#F8E6D8` | 🫧 |
+| `diet` 吃喝拉撒睡 | `#D4896A` | `#F5E0D6` | 🥣 |
+| `social` 社交 | `#7EB8B2` | `#DCEEED` | 👋 |
+| `medical` 医疗 | `#6B8FD6` | `#DDE6F5` | 💊 |
+| **quote 语录** | `#A98BC4` | `#EDE5F3` | 💬 |
+| Legacy `sleep` / `health` / `question` | 仅展示兼容 | | 🌙 / 🌙 / ❓ |
 
 **不要用 `<el-tag type="danger">` 这类默认标签**——方角 + 无描边，跟糖果风冲突。自己写一个 `<TypeChip>`：
 
@@ -870,25 +981,73 @@ GET    /api/events?limit=50&before=<iso>   时间线分页
 GET    /api/events/:id
 PATCH  /api/events/:id        补充详情
 DELETE /api/events/:id
-GET    /api/config/scenes     场景卡片配置（后期做成可编辑时存服务端）
 
 # 语录（渺言妙语）
 POST   /api/quotes            创建
-GET    /api/quotes            列表（按月龄分组返回，见 4.6.4）
-GET    /api/quotes?random=1   随机一条（毯子精灵气泡用，见 9.1.6）
+GET    /api/quotes            列表（按月龄分组）
+GET    /api/quotes?random=1   随机一条（毯子精灵气泡）
+GET    /api/quotes?daily=1    今日一句（≥20 条，按东八区日稳定选取）
+GET    /api/quotes?q=关键词   搜索（原话/上下文/感受）
 GET    /api/quotes/:id
-PATCH  /api/quotes/:id        补充上下文/解读
+PATCH  /api/quotes/:id        context / note / saidAt
 DELETE /api/quotes/:id
 
 GET    /api/health
+
+# 分析（阶段二）
+GET    /api/analytics/meltdown?days=60
+# 响应字段含：days, sampleSize, canConclude, intensity/duration 统计,
+# byWeek, byChip, byTrigger, byLocation, byCoping, byNapped, byHour
+# （有意不含 byCaregiver / byWeekday）
+
+# 相册（阶段三）
+POST   /api/photos            multipart 字段 file
+GET    /api/photos?limit=&before=
+GET    /api/photos/:id
+GET    /api/photos/:id/file?v=thumb|original
+DELETE /api/photos/:id
+
+# 技能（阶段三）
+GET    /api/skills
+POST   /api/skills            自定义技能（可 AI 分类）
+PUT    /api/skills/:id/mark   body: { status: todo|emerging|done, note? }
+PATCH  /api/skills/:id/note   body: { note? }
+DELETE /api/skills/:id        仅自定义技能
+
+# AI（阶段三）
+GET    /api/ai/status
+POST   /api/ai/chat           { messages, days?, includeStats?, chatId? } → { reply, model, chatId? }
+GET    /api/ai/chats
+GET    /api/ai/chats/:id
+DELETE /api/ai/chats/:id
+POST   /api/ai/insight        分析页一键解读（默认不入库）
+POST   /api/ai/skill-suggest  { label } → 预览 emoji/领域（不写库）
+POST   /api/ai/scene-suggest  { label } → 预览 emoji + type（不写库）
+
+# 可选应用内登录（未配 MIA_AUTH_* 则关闭）
+GET    /api/auth/status
+POST   /api/auth/login
+GET    /api/auth/me
 ```
 
 **要点：**
 
 - **POST 必须幂等**。离线重放可能重复提交，用客户端生成的 `id` 做主键，`INSERT OR IGNORE`
 - 统一响应格式 `{ ok: boolean, data?: T, error?: string }`
-- 阶段一**不做应用内鉴权**，改用 Nginx Basic Auth 挡在前面（**见 8.2 节，必做**）
-- `GET /api/config/scenes` 阶段一**直接读前端 config 文件即可**，不用建接口；等场景卡片要跨设备同步时才挪到服务端
+- **公网主挡：Nginx Basic Auth**（见 8.2）；**可选**应用内 Bearer（`MIA_AUTH_*`）
+- 场景卡片阶段一～三仍读前端 `config/scenes.ts`（localStorage `mia-scenes-v3`），不强制服务端同步
+- **`DELETE` / 无 body 的请求不要默认带 `Content-Type: application/json`**（Fastify 空 body 会 400）
+
+### 6.0 阶段二/三页面摘要
+
+| 路由 | 说明 |
+| --- | --- |
+| `/analysis` | 概览 + 按周 + 高发时段 / chips / 触发 / 地点 / 应对 / 午睡；「生成解读」走 AI |
+| `/album` | 照片网格 + 上传；语录 ±30 分钟挂图 |
+| `/skills` | 按领域；三态 todo / emerging / done；可 `POST` 自定义 |
+| `/consult` | 多轮咨询 + 历史抽屉；会话入 `ai_chats`；思考中有动效 |
+
+`byHour` 槽：`dawn` 0–6 / `morning` 6–11 / `noon` 11–14 / `afternoon` 14–17 / `evening` 17–20 / `night` 20–24。
 
 ### 6.1 ⚠️ 环境变量与 API 地址（别硬编码）
 
@@ -905,18 +1064,18 @@ VITE_ENABLE_SW=false            # 买了域名上 HTTPS 后改 true（见 8.3）
 ```
 
 ```typescript
-// mia-web/src/api/client.ts
+// mia-web/src/api/client.ts（摘要）
 const BASE = import.meta.env.VITE_API_BASE ?? '/api'
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-    ...init,
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const json = await res.json()
-  if (!json.ok) throw new Error(json.error ?? '请求失败')
-  return json.data as T
+  const method = (init?.method ?? 'GET').toUpperCase()
+  const headers: Record<string, string> = { ...getAuthHeaders() }
+  // 仅在有 JSON body 时设置 Content-Type，避免空 DELETE 被 Fastify 拒
+  if (init?.body != null && method !== 'GET' && method !== 'HEAD') {
+    headers['Content-Type'] = 'application/json'
+  }
+  const res = await fetch(`${BASE}${path}`, { ...init, headers: { ...headers, ...(init?.headers as object) } })
+  // ...统一解包 { ok, data }
 }
 ```
 
@@ -925,21 +1084,21 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
 ```jsonc
 // mia-web/package.json
 "scripts": {
-  "dev": "vite",                    // 前端 5173
+  "dev": "vite",                    // 前端 5173（冲突可换）
   "build": "vue-tsc -b && vite build",
   "preview": "vite preview"
 }
 
 // server/package.json
 "scripts": {
-  "dev": "nest start --watch",      // 后端 127.0.0.1:3000
+  "dev": "nest start --watch",      // 后端 127.0.0.1:3000（冲突可换 3001）
   "build": "nest build",
   "start": "node dist/main"
 }
 ```
 
 > ⚠️ **端口提醒**：服务器上已跑着「班主任管理平台」，配反向代理前先确认 3000 端口没被占用
-> （`ss -tlnp | grep 3000`），冲突就换一个（如 3001），前后端对上即可。
+> （`ss -tlnp | grep 3000`），冲突就换一个（如 3001），前后端对上即可。本地开发常用 `MIA_PORT=3001`。
 
 ---
 
@@ -1084,6 +1243,7 @@ cat /etc/nginx/.htpasswd
 - `auth_basic_user_file` 路径要放在 Nginx 能读到的位置
 - 加完重载 Nginx：`nginx -s reload` 或在 1Panel 点重启
 - **Basic Auth 在 HTTP 下是明文传输密码的**。等有域名上 HTTPS 之后才真正安全。现阶段的作用是挡住自动扫描，不是防窃听
+- **可选第二道**：服务端配 `MIA_AUTH_USERNAME` / `MIA_AUTH_PASSWORD` / `MIA_AUTH_SECRET` 启用应用内 Bearer 登录（`/login`）；未配则关闭，仅依赖 Nginx
 
 ### 8.3 以后买了域名再补
 
@@ -1102,18 +1262,17 @@ cat /etc/nginx/.htpasswd
 - [x] **T1** 初始化 Vite + Vue3 + TS 项目，配好 Pinia、Element Plus 按需引入
 - [x] **T1.5** ⭐ **视觉风格基建**（见 1.2 节）：`tokens.css` 设计变量 + `element-override.css` 覆写 + `<TypeChip>` 组件 + 卡片/按钮/输入框基础样式。**这一步不做，后面所有页面都会长成后台管理系统**
 - [x] **T2** 后端 **NestJS + FastifyAdapter** + better-sqlite3，建表 + 健康检查接口（见 1.0 节）
-- [x] **T3** 定义 `types/event.ts` 前后端共用类型
-- [x] **T4** 后端 CRUD 接口（POST 幂等 + GET 分页）
-- [x] **T2** 后端 **NestJS + FastifyAdapter** + better-sqlite3，建表 + 健康检查接口（见 1.0 节）
-- [x] **T3** 定义 `types/event.ts` 前后端共用类型
+- [x] **T3** 定义 `types/event.ts` 前后端共用类型（含新类型枚举与 Legacy）
 - [x] **T4** 后端 CRUD 接口（POST 幂等 + GET 分页）
 - [x] **T5** 响应式骨架：电脑端侧边栏 + 手机端 TabBar，断点 ≥1024 / <768
-- [x] **T6** 录入页：场景卡片组件（读 config，按 count 排序）**—— 糖果风：14px 圆角 + 2.5px 描边 + 大 emoji + hover 弹起，不用 el-card**
-- [x] **T7** 录入页：chips 组件 + 字段表单 + 默认值逻辑（记住上次的记录人/地点）**—— chips 胶囊形 + 2px 描边，不用 el-tag**
+- [x] **T6** 录入页：场景卡片 v3（类型入口 + emoji；`mia-scenes-v3`）**—— 糖果风：14px 圆角 + 2.5px 描边 + 大 emoji + hover 弹起，不用 el-card**
+- [x] **T7** 录入页：chips + 字段表单 + 记住上次记录人（仅爸妈）/ 地点
 - [x] **T8** 离线队列：IndexedDB 封装 + 提交失败存本地 + 启动时重放
-- [x] **T9** 时间线页：月份导航 + 事件流 + 类型筛选 + 右侧抽屉详情**—— 卡片奶油底 + 2.5px 描边 + 硬阴影，卡片依次蹦入**
+- [x] **T9** 时间线页：月份导航 + 事件流 + 类型筛选 + 右侧抽屉详情（可删）
 - [x] **T10** PWA manifest + 图标（192/512）；**Service Worker 配置写好但默认关闭**，见 7.1
 - [ ] **T11** 部署到 1Panel（**IP + HTTP + Basic Auth**，见 8.1/8.2），电脑端实测浏览 + 手机端实测录入耗时
+
+> 阶段二/三见规格 §6.0 与 `.cursor/rules/45|46|47|48`。
 
 **渺言妙语（语录模块，见 4.6 节）：**
 
@@ -1564,6 +1723,8 @@ src/assets/sprite/
 | **iOS Safari 的 IndexedDB** | 隐私模式下不可用，做好降级（提示用户）                                                                  |
 | **Service Worker 缓存**      | 更新后可能看到旧页面，`registerType: 'autoUpdate'` + 提示刷新                                       |
 | **POST 幂等**                | 离线重放必然遇到，一定要 `INSERT OR IGNORE`                                                      |
+| **空 DELETE 别带 JSON Content-Type** | Fastify 会因空 body 报 400；`client.ts` 仅在有 body 时设置该头 |
+| **分析别加回记录人/按星期** | 已有意从 analytics 去掉，勿再加 |
 | **⭐ 别长成后台管理系统**            | Element Plus 默认是后台风（方角、灰描边、商务蓝）。**必须按 1.2 节做可爱化改造**，并在 T1.5 一次性建好 token，不然后面每个页面都要返工 |
 | **别用 `<el-tag>`**          | 方角 + 无描边，跟糖果风冲突。自己写 `<TypeChip>`（胶囊形 + 2px 描边）                                       |
 | **图标用 emoji**              | Element Plus 图标是细描边线性风格，偏商务。emoji 饱满有笔触感且零成本                                          |

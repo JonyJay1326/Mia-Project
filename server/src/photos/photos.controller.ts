@@ -8,14 +8,19 @@ import {
   Req,
   Res,
 } from '@nestjs/common'
-import type { MultipartFile } from '@fastify/multipart'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { PhotosService } from './photos.service'
 import { Public } from '../auth/public.decorator'
 
-/** 带 multipart.file() 的 Fastify 请求 */
+/** 带 multipart.parts() 的 Fastify 请求 */
 type MultipartRequest = FastifyRequest & {
-  file: () => Promise<MultipartFile | undefined>
+  parts: () => AsyncIterableIterator<{
+    type: string
+    fieldname: string
+    filename?: string
+    mimetype?: string
+    toBuffer: () => Promise<Buffer>
+  }>
 }
 
 /** 相册接口 */
@@ -24,20 +29,43 @@ export class PhotosController {
   constructor(private readonly photosService: PhotosService) {}
 
   /**
-   * 上传照片（multipart 字段名 file）
+   * 上传照片或视频（multipart：file 必填；视频可选 thumb 封面）
    * POST /api/photos
    */
   @Post()
   async upload(@Req() req: MultipartRequest) {
-    const file = await req.file()
-    if (!file) {
-      return { ok: false, error: '请选择图片文件（字段名 file）' }
+    let main:
+      | { buffer: Buffer; filename?: string; mimetype: string }
+      | undefined
+    let thumbBuffer: Buffer | undefined
+
+    for await (const part of req.parts()) {
+      if (part.type !== 'file') {
+        continue
+      }
+      const buffer = await part.toBuffer()
+      if (part.fieldname === 'thumb') {
+        thumbBuffer = buffer
+        continue
+      }
+      if (part.fieldname === 'file' || !main) {
+        main = {
+          buffer,
+          filename: part.filename,
+          mimetype: part.mimetype || 'application/octet-stream',
+        }
+      }
     }
-    const buffer = await file.toBuffer()
+
+    if (!main) {
+      return { ok: false, error: '请选择图片或视频文件（字段名 file）' }
+    }
+
     const data = await this.photosService.createFromUpload({
-      buffer,
-      filename: file.filename,
-      mimetype: file.mimetype,
+      buffer: main.buffer,
+      filename: main.filename,
+      mimetype: main.mimetype,
+      thumbBuffer,
     })
     return { ok: true, data }
   }

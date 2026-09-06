@@ -46,3 +46,16 @@ export function markSkill(
     body: JSON.stringify(body),
   })
 }
+
+/** 更新技能备注 */
+export function updateSkillNote(id: string, note: string | null) {
+  return request<SkillItem>(`/skills/${id}/note`, {
+    method: 'PATCH',
+    body: JSON.stringify({ note }),
+  })
+}
+
+/** 删除自定义技能 */
+export function deleteSkill(id: string) {
+  return request<{ id: string }>(`/skills/${id}`, { method: 'DELETE' })
+}

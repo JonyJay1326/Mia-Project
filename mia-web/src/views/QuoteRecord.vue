@@ -3,6 +3,7 @@ import { nextTick, onMounted, reactive, ref } from 'vue'
 import { createQuote } from '@/api/events'
 import { useDraftStore } from '@/stores/draft'
 import { BIRTH_DATE, monthAge } from '@/utils/date'
+import { createId } from '@/utils/id'
 
 const draftStore = useDraftStore()
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
@@ -54,7 +55,7 @@ async function submit() {
   saving.value = true
   const saidAt = new Date().toISOString()
   const payload = {
-    id: crypto.randomUUID(),
+    id: createId(),
     content,
     context: form.context.trim() || null,
     note: form.note.trim() || null,

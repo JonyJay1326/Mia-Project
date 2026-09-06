@@ -6,8 +6,11 @@ import type { EventInput, QuoteInput } from '../types/event'
 import { BIRTH_DATE, monthAge } from '../utils/date'
 
 /**
- * 启动时写入历史种子数据
+ * 启动时写入历史 / 示例种子数据
  * 各条用固定 id + 存在则跳过，可重复启动不重复插入
+ *
+ * 开关：MIA_SEED=1/true 强制开；0/false 强制关；
+ * 未设置时仅在非 production（NODE_ENV !== 'production'）写入
  */
 @Injectable()
 export class SeedService implements OnModuleInit {
@@ -17,8 +20,14 @@ export class SeedService implements OnModuleInit {
     private readonly quotesService: QuotesService,
   ) {}
 
-  /** 模块初始化后执行种子逻辑 */
+  /** 模块初始化后执行种子逻辑（生产默认跳过） */
   onModuleInit() {
+    if (!shouldRunSeed()) {
+      console.log(
+        '[seed] 已跳过示例数据（生产默认关闭；开发可设 MIA_SEED=1）',
+      )
+      return
+    }
     this.seedHistoricalEvent()
     this.seedDemoMeltdowns()
     this.seedDemoQuotes()
@@ -30,9 +39,9 @@ export class SeedService implements OnModuleInit {
     const created = this.insertEventIfAbsent({
       id: 'seed-2026-08-31-early-wake',
       happenedAt,
-      type: 'health',
+      type: 'sleep',
       summary: '早醒要喝奶，说肚子不舒服，放屁后缓解但不再睡',
-      chips: ['睡不好/早醒', '肚子不舒服'],
+      chips: ['早醒', '肚子不舒服'],
       location: 'home',
       caregiver: 'dad',
       napped: null,
@@ -122,7 +131,7 @@ export class SeedService implements OnModuleInit {
         durationMin: 5,
         coping: ['给两个选项', '讲道理'],
         outcome: '换小份后吃了几口',
-        caregiver: 'grandma',
+        caregiver: 'mom',
         napped: 1,
       },
     ]
@@ -224,4 +233,18 @@ export class SeedService implements OnModuleInit {
     })
     return true
   }
+}
+
+/**
+ * 是否写入示例种子：显式 MIA_SEED 优先，否则非 production 才写
+ */
+function shouldRunSeed(): boolean {
+  const flag = (process.env.MIA_SEED ?? '').trim().toLowerCase()
+  if (flag === '1' || flag === 'true' || flag === 'yes') {
+    return true
+  }
+  if (flag === '0' || flag === 'false' || flag === 'no') {
+    return false
+  }
+  return process.env.NODE_ENV !== 'production'
 }

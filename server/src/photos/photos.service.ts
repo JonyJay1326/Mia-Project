@@ -14,6 +14,7 @@ import type { PhotoRecord, PhotoRow } from '../types/photo'
 import {
   ensurePhotoDirs,
   extFromMime,
+  isVideoMime,
   mapPhotoRow,
   originalPath,
   thumbPath,
@@ -42,15 +43,20 @@ export interface IncomingPhoto {
   buffer: Buffer
   filename?: string
   mimetype: string
+  /** 客户端截取的视频封面（可选） */
+  thumbBuffer?: Buffer
 }
 
-const ALLOWED_MIME = new Set([
+const IMAGE_MIME = new Set([
   'image/jpeg',
   'image/jpg',
   'image/png',
   'image/webp',
   'image/gif',
 ])
+
+const IMAGE_MAX_BYTES = 20 * 1024 * 1024
+const VIDEO_MAX_BYTES = 100 * 1024 * 1024
 
 /** 相册读写：上传、缩略图、列表、删除、语录配图 */
 @Injectable()
@@ -63,18 +69,27 @@ export class PhotosService implements OnModuleInit {
   }
 
   /**
-   * 上传一张照片：落盘原图 + 生成缩略图 + 写库 + 尝试配语录
+   * 上传一张照片或视频：落盘 + 缩略图/占位图 + 写库 + 尝试配语录
    */
   async createFromUpload(file: IncomingPhoto): Promise<PhotoRecord> {
     const mime = (file.mimetype || '').toLowerCase()
-    if (!ALLOWED_MIME.has(mime) && mime !== 'image/jpg') {
-      throw new BadRequestException('仅支持 JPG / PNG / WebP / GIF')
+    const isVideo = isVideoMime(mime)
+    const isImage = IMAGE_MIME.has(mime) || mime === 'image/jpg'
+
+    if (!isVideo && !isImage) {
+      throw new BadRequestException(
+        '仅支持 JPG / PNG / WebP / GIF，或 MP4 / WebM 视频',
+      )
     }
     if (!file.buffer?.length) {
       throw new BadRequestException('空文件')
     }
-    if (file.buffer.length > 20 * 1024 * 1024) {
-      throw new BadRequestException('单张不超过 20MB')
+
+    const maxBytes = isVideo ? VIDEO_MAX_BYTES : IMAGE_MAX_BYTES
+    if (file.buffer.length > maxBytes) {
+      throw new BadRequestException(
+        isVideo ? '单个视频不超过 100MB' : '单张图片不超过 20MB',
+      )
     }
 
     const id = randomUUID()
@@ -82,20 +97,33 @@ export class PhotosService implements OnModuleInit {
     const ext = extFromMime(normalizedMime)
     const now = new Date().toISOString()
 
-    const takenAt = await readTakenAt(file.buffer, now)
-    const sharp = await loadSharp()
-    const image = sharp(file.buffer, { failOn: 'none' })
-    const meta = await image.metadata()
-    const width = meta.width ?? null
-    const height = meta.height ?? null
+    let takenAt = now
+    let width: number | null = null
+    let height: number | null = null
 
-    writeFileSync(originalPath(id, ext), file.buffer)
+    if (isVideo) {
+      writeFileSync(originalPath(id, ext), file.buffer)
+      if (file.thumbBuffer?.length) {
+        await writeUploadedVideoThumb(id, file.thumbBuffer)
+      } else {
+        await writeVideoPlaceholderThumb(id)
+      }
+    } else {
+      takenAt = await readTakenAt(file.buffer, now)
+      const sharp = await loadSharp()
+      const image = sharp(file.buffer, { failOn: 'none' })
+      const meta = await image.metadata()
+      width = meta.width ?? null
+      height = meta.height ?? null
 
-    await sharp(file.buffer, { failOn: 'none' })
-      .rotate()
-      .resize(480, 480, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 78 })
-      .toFile(thumbPath(id))
+      writeFileSync(originalPath(id, ext), file.buffer)
+
+      await sharp(file.buffer, { failOn: 'none' })
+        .rotate()
+        .resize(480, 480, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 78 })
+        .toFile(thumbPath(id))
+    }
 
     this.dbService.db
       .prepare(
@@ -152,14 +180,14 @@ export class PhotosService implements OnModuleInit {
   }
 
   /**
-   * 打开文件流（缩略图或原图）
+   * 打开文件流（缩略图或原文件）
    */
   openFile(id: string, variant: 'thumb' | 'original') {
     const row = this.dbService.db
       .prepare('SELECT * FROM photos WHERE id = ?')
       .get(id) as PhotoRow | undefined
     if (!row) {
-      throw new NotFoundException('照片不存在')
+      throw new NotFoundException('媒体不存在')
     }
 
     if (variant === 'thumb') {
@@ -177,7 +205,7 @@ export class PhotosService implements OnModuleInit {
     const ext = extFromMime(row.mime)
     const path = originalPath(id, ext)
     if (!existsSync(path)) {
-      throw new NotFoundException('原图缺失')
+      throw new NotFoundException('原文件缺失')
     }
     return {
       stream: createReadStream(path),
@@ -186,7 +214,7 @@ export class PhotosService implements OnModuleInit {
     }
   }
 
-  /** 删除照片并清除语录上的关联 */
+  /** 删除并清除语录上的关联 */
   remove(id: string): boolean {
     const row = this.dbService.db
       .prepare('SELECT * FROM photos WHERE id = ?')
@@ -197,6 +225,9 @@ export class PhotosService implements OnModuleInit {
 
     this.dbService.db
       .prepare('UPDATE quotes SET photo_id = NULL WHERE photo_id = ?')
+      .run(id)
+    this.dbService.db
+      .prepare('UPDATE events SET photo_id = NULL WHERE photo_id = ?')
       .run(id)
     this.dbService.db.prepare('DELETE FROM photos WHERE id = ?').run(id)
 
@@ -272,6 +303,40 @@ export class PhotosService implements OnModuleInit {
       )
       .run(best.id, new Date().toISOString(), quoteId)
   }
+}
+
+/**
+ * 把客户端传来的视频封面压成统一 webp 缩略图
+ */
+async function writeUploadedVideoThumb(id: string, thumbBuffer: Buffer) {
+  const sharp = await loadSharp()
+  await sharp(thumbBuffer, { failOn: 'none' })
+    .rotate()
+    .resize(480, 480, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 78 })
+    .toFile(thumbPath(id))
+}
+
+/**
+ * 视频无封面时：生成奶油底 + 珊瑚播放钮的占位缩略图
+ */
+async function writeVideoPlaceholderThumb(id: string) {
+  const sharp = await loadSharp()
+  const size = 480
+  const svg = Buffer.from(`
+    <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#fffbf0"/>
+          <stop offset="100%" stop-color="#f5ead6"/>
+        </linearGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#g)"/>
+      <circle cx="240" cy="240" r="64" fill="#e8736b" stroke="#6b5a4e" stroke-width="5"/>
+      <polygon points="222,208 222,272 278,240" fill="#fffdf8"/>
+    </svg>
+  `)
+  await sharp(svg).webp({ quality: 80 }).toFile(thumbPath(id))
 }
 
 /**

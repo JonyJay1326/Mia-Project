@@ -1,15 +1,23 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue'
 import MiaMarkdown from '@/components/MiaMarkdown.vue'
+import { formatFetchError } from '@/api/client'
 import {
+  deleteAiChat,
+  fetchAiChat,
+  fetchAiChats,
   fetchAiStatus,
   postAiChat,
   type AiChatMessage,
+  type AiChatSummary,
   type AiStatus,
 } from '@/api/ai'
+import { useMiaConfirm } from '@/composables/useMiaConfirm'
 
+const { confirm } = useMiaConfirm()
 const status = ref<AiStatus | null>(null)
 const messages = ref<AiChatMessage[]>([])
+const chatId = ref<string | null>(null)
 const input = ref('')
 const sending = ref(false)
 const error = ref('')
@@ -17,6 +25,11 @@ const listRef = ref<HTMLElement | null>(null)
 const inputEl = ref<HTMLTextAreaElement | null>(null)
 /** 输入框是否展开（聚焦时单行→多行） */
 const inputFocused = ref(false)
+
+const historyOpen = ref(false)
+const historyLoading = ref(false)
+const historyItems = ref<AiChatSummary[]>([])
+const historyError = ref('')
 
 /** 提问模板（与档案一致） */
 const templates = [
@@ -91,10 +104,14 @@ async function send() {
       messages: messages.value,
       includeStats: true,
       days: 60,
+      chatId: chatId.value ?? undefined,
     })
     messages.value.push({ role: 'assistant', content: res.reply })
+    if (res.chatId) {
+      chatId.value = res.chatId
+    }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '发送失败'
+    error.value = formatFetchError(e)
     messages.value.pop()
     input.value = content
   } finally {
@@ -111,10 +128,79 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-/** 清空对话 */
-function clearChat() {
+/** 新开对话（不删历史） */
+function startNewChat() {
   messages.value = []
+  chatId.value = null
   error.value = ''
+  historyOpen.value = false
+}
+
+/** 打开历史面板并刷新列表 */
+async function openHistory() {
+  historyOpen.value = true
+  historyError.value = ''
+  historyLoading.value = true
+  try {
+    historyItems.value = await fetchAiChats()
+  } catch (e) {
+    historyError.value = formatFetchError(e)
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+/** 关闭历史面板 */
+function closeHistory() {
+  historyOpen.value = false
+}
+
+/** 加载某条历史到当前对话 */
+async function loadHistoryItem(item: AiChatSummary) {
+  try {
+    const detail = await fetchAiChat(item.id)
+    messages.value = detail.messages
+    chatId.value = detail.id
+    error.value = ''
+    historyOpen.value = false
+    await scrollBottom()
+  } catch (e) {
+    historyError.value = formatFetchError(e)
+  }
+}
+
+/** 删除一条历史 */
+async function removeHistoryItem(item: AiChatSummary) {
+  const ok = await confirm({
+    title: '删除这条咨询？',
+    message: `删除后不可恢复。\n\n「${item.title}」`,
+    confirmText: '删除',
+    cancelText: '再想想',
+    danger: true,
+  })
+  if (!ok) {
+    return
+  }
+  try {
+    await deleteAiChat(item.id)
+    historyItems.value = historyItems.value.filter((h) => h.id !== item.id)
+    if (chatId.value === item.id) {
+      startNewChat()
+      historyOpen.value = true
+    }
+  } catch (e) {
+    historyError.value = formatFetchError(e)
+  }
+}
+
+/** 格式化更新时间 */
+function formatUpdated(iso: string) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) {
+    return ''
+  }
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 onMounted(() => {
@@ -133,14 +219,17 @@ onMounted(() => {
           与近期记录事实。
         </p>
       </div>
-      <button
-        v-if="messages.length"
-        type="button"
-        class="mia-btn"
-        @click="clearChat"
-      >
-        清空对话
-      </button>
+      <div class="page__actions">
+        <button type="button" class="mia-btn" @click="openHistory">历史</button>
+        <button
+          v-if="messages.length || chatId"
+          type="button"
+          class="mia-btn"
+          @click="startNewChat"
+        >
+          新对话
+        </button>
+      </div>
     </header>
 
     <section
@@ -191,9 +280,16 @@ onMounted(() => {
         <pre v-if="m.role === 'user'" class="bubble__text">{{ m.content }}</pre>
         <MiaMarkdown v-else class="bubble__text" :source="m.content" />
       </div>
-      <div v-if="sending" class="bubble bubble--bot">
+      <div v-if="sending" class="bubble bubble--bot bubble--thinking" aria-live="polite">
         <div class="bubble__role">Mia 助手</div>
-        <p class="bubble__text">思考中…</p>
+        <div class="thinking">
+          <span class="thinking__label">思考中</span>
+          <span class="thinking__dots" aria-hidden="true">
+            <i class="thinking__dot" />
+            <i class="thinking__dot" />
+            <i class="thinking__dot" />
+          </span>
+        </div>
       </div>
     </div>
 
@@ -221,6 +317,54 @@ onMounted(() => {
         {{ sending ? '发送中…' : '发送（Ctrl+Enter）' }}
       </button>
     </div>
+
+    <div
+      v-if="historyOpen"
+      class="history-mask"
+      @click.self="closeHistory"
+    >
+      <aside class="history mia-card" @click.stop>
+        <div class="history__head">
+          <h2 class="history__title">咨询历史</h2>
+          <button type="button" class="mia-btn" @click="closeHistory">关闭</button>
+        </div>
+        <p v-if="historyLoading" class="history__status">加载中…</p>
+        <p v-else-if="historyError" class="history__status history__status--err">
+          {{ historyError }}
+        </p>
+        <p v-else-if="!historyItems.length" class="history__status">
+          还没有保存的对话。发一条咨询后会出现在这里。
+        </p>
+        <ul v-else class="history__list">
+          <li
+            v-for="item in historyItems"
+            :key="item.id"
+            class="history__item"
+            :class="{ 'is-active': chatId === item.id }"
+          >
+            <button
+              type="button"
+              class="history__main"
+              @click="loadHistoryItem(item)"
+            >
+              <span class="history__item-title">{{ item.title }}</span>
+              <span class="history__item-meta">
+                {{ formatUpdated(item.updatedAt) }}
+                · {{ item.messageCount }} 条
+              </span>
+            </button>
+            <button
+              type="button"
+              class="history__delete"
+              aria-label="删除"
+              @click="removeHistoryItem(item)"
+            >
+              删除
+            </button>
+          </li>
+        </ul>
+      </aside>
+    </div>
   </div>
 </template>
 
@@ -242,6 +386,12 @@ onMounted(() => {
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
+}
+
+.page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .page__title {
@@ -327,6 +477,99 @@ onMounted(() => {
   border-color: var(--c-grape);
 }
 
+.bubble--thinking {
+  animation: thinking-bubble-in 0.35s var(--ease-bounce) both;
+}
+
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 1.55em;
+}
+
+.thinking__label {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--c-ink-2);
+  animation: thinking-label-pulse 1.6s ease-in-out infinite;
+}
+
+.thinking__dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.thinking__dot {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-grape);
+  animation: thinking-dot-bounce 1.05s var(--ease-bounce) infinite;
+}
+
+.thinking__dot:nth-child(2) {
+  animation-delay: 0.14s;
+  background: color-mix(in srgb, var(--c-grape) 75%, var(--c-honey));
+}
+
+.thinking__dot:nth-child(3) {
+  animation-delay: 0.28s;
+  background: color-mix(in srgb, var(--c-grape) 70%, var(--c-mint));
+}
+
+@keyframes thinking-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes thinking-label-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes thinking-dot-bounce {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.45;
+  }
+  35% {
+    transform: translateY(-7px) scale(1.15);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble--thinking,
+  .thinking__label,
+  .thinking__dot {
+    animation: none;
+  }
+
+  .thinking__label {
+    opacity: 0.85;
+  }
+
+  .thinking__dot {
+    opacity: 0.7;
+  }
+}
+
 .bubble__role {
   font-size: var(--fs-xs);
   font-weight: 800;
@@ -396,6 +639,120 @@ pre.bubble__text {
   padding-block: 10px;
   overflow-y: auto;
   resize: vertical;
+}
+
+.history-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(61, 43, 31, 0.28);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.history {
+  width: min(100%, 380px);
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
+  border-right: none;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 16px;
+  overflow: hidden;
+}
+
+.history__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.history__title {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+
+.history__status {
+  margin: 12px 0;
+  color: var(--c-ink-2);
+  font-size: var(--fs-sm);
+}
+
+.history__status--err {
+  color: var(--c-coral);
+  font-weight: 700;
+}
+
+.history__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history__item {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  border: var(--stroke-light);
+  border-radius: var(--r-md);
+  background: var(--c-cream-2);
+  overflow: hidden;
+}
+
+.history__item.is-active {
+  border-color: var(--c-grape);
+  background: var(--c-grape-soft);
+}
+
+.history__main {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.history__item-title {
+  display: block;
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history__item-meta {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--fs-xs);
+  color: var(--c-ink-3);
+}
+
+.history__delete {
+  flex-shrink: 0;
+  padding: 0 12px;
+  border: 0;
+  border-left: var(--stroke-light);
+  background: transparent;
+  color: var(--c-ink-2);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+
+.history__delete:hover {
+  color: var(--c-coral);
 }
 
 @media (min-width: 768px) {

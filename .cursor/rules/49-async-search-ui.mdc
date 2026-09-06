@@ -1,0 +1,48 @@
+---
+description: 异步搜索 UI 状态机——避免 debounce 期间误显「无结果」
+alwaysApply: true
+---
+
+# 异步搜索 UI 状态机
+
+带 **debounce** 的搜索，不要只用「有输入 + 结果数组是否为空」判断 UI，否则会**先闪「没找到」**。
+
+## 典型错误
+
+```text
+用户输入 → isSearching=true（有 query）
+debounce 320ms 内 → searching=false，results=[]
+模板：isSearching && !searching && results.length===0 → 误显「没找到」
+```
+
+同理：旧结果属于**上一次** query，新 query 未 settled 前不要展示旧结果或空态。
+
+## 正确状态（至少四元）
+
+| 状态 | 含义 |
+|------|------|
+| `searchPending` | 输入已变，debounce 或请求尚未结束（本次结果未就绪） |
+| `searching` | 请求进行中 |
+| `searchSettledQuery` | 当前 `results` 对应的搜索词 |
+| `searchSeq` | 输入变化时递增，作废进行中的旧请求 |
+
+**展示规则：**
+
+- **搜索中**：`pending \|\| searching`（含 debounce 等待 + 请求 + 可选最少展示时长）
+- **无结果**：`settled && settledQuery === 当前输入 && results.length === 0`
+- **结果列表**：`settled && settledQuery === 当前输入 && results.length > 0`
+- **「找到 N 条」**：同上 settled，且 `N > 0`（与空态文案二选一，避免重复）
+
+## 输入变化时
+
+1. `searchSeq++` 作废旧请求
+2. 立即 `searchPending = true`
+3. debounce 结束后发请求；结束时写 `searchSettledQuery = q` 再清 pending
+
+## 最少展示时长
+
+若要求「搜索中」至少显示 300ms，在 `finally` 里 `await waitMin(300)` 后再清 `searching/pending`；**不要**在请求返回瞬间清 pending 却还没 settled。
+
+## 本项目参考
+
+`mia-web/src/views/Quotes.vue` — `searchPending` / `searchSettledQuery` / `showSearchLoading` / `searchSettled`。

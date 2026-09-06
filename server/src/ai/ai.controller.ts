@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common'
 import { suggestSceneEmoji } from './scene-emoji'
 import { classifySkillLabel } from '../skills/skill-classify'
 import {
@@ -19,6 +27,36 @@ export class AiController {
   @Get('status')
   status() {
     return { ok: true, data: this.aiService.getStatus() }
+  }
+
+  /**
+   * 咨询历史列表
+   * GET /api/ai/chats
+   */
+  @Get('chats')
+  listChats(@Query('limit') limit?: string) {
+    const data = this.aiService.listChats(
+      limit ? Number(limit) : undefined,
+    )
+    return { ok: true, data }
+  }
+
+  /**
+   * 单条咨询历史
+   * GET /api/ai/chats/:id
+   */
+  @Get('chats/:id')
+  getChat(@Param('id') id: string) {
+    return { ok: true, data: this.aiService.getChat(id) }
+  }
+
+  /**
+   * 删除咨询历史
+   * DELETE /api/ai/chats/:id
+   */
+  @Delete('chats/:id')
+  removeChat(@Param('id') id: string) {
+    return { ok: true, data: this.aiService.removeChat(id) }
   }
 
   /**
@@ -52,7 +90,7 @@ export class AiController {
   }
 
   /**
-   * 场景名称预览 emoji（不写库）
+   * 自定义场景：预览 emoji + 新类型 + 5 条 chips（不写库）
    * POST /api/ai/scene-suggest
    */
   @Post('scene-suggest')

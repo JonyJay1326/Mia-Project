@@ -29,11 +29,6 @@ const weekMax = computed(() =>
   (data.value?.byWeek ?? []).reduce((m, w) => Math.max(m, w.count), 0),
 )
 
-/** 星期分布最大值 */
-const weekdayMax = computed(() =>
-  (data.value?.byWeekday ?? []).reduce((m, w) => Math.max(m, w.count), 0),
-)
-
 /** 午睡对照行 */
 const nappedRows = computed(() => {
   if (!data.value) return []
@@ -221,25 +216,6 @@ onMounted(() => {
           color="var(--c-coral)"
           empty-text="还没有崩溃时间数据"
         />
-        <section class="mia-card">
-          <h2 class="section-title">按星期</h2>
-          <p
-            v-if="!data.byWeekday.some((w) => w.count > 0)"
-            class="section-empty"
-          >
-            暂无数据
-          </p>
-          <div v-else class="week-list">
-            <StatBar
-              v-for="w in data.byWeekday"
-              :key="w.key"
-              :label="w.label"
-              :value="w.count"
-              :max="weekdayMax || 1"
-              color="var(--c-honey)"
-            />
-          </div>
-        </section>
         <RankCard
           title="高发场景（chips）"
           :items="data.byChip"
@@ -255,11 +231,6 @@ onMounted(() => {
           title="地点"
           :items="data.byLocation"
           color="var(--c-mint)"
-        />
-        <RankCard
-          title="在场照护人"
-          :items="data.byCaregiver"
-          color="var(--c-grape)"
         />
         <RankCard
           title="试过的应对"

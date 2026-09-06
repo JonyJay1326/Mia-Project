@@ -24,12 +24,26 @@ export class QuotesController {
   }
 
   /**
-   * 列表：默认按月龄分组；?random=1 返回随机一条（精灵气泡）
+   * 列表：默认按月龄分组
+   * ?random=1 随机一条；?daily=1 今日一句；?q= 搜索
    */
   @Get()
-  list(@Query('random') random?: string) {
+  list(
+    @Query('random') random?: string,
+    @Query('daily') daily?: string,
+    @Query('q') q?: string,
+  ) {
     if (random === '1' || random === 'true') {
       const data = this.quotesService.randomOne()
+      return { ok: true, data }
+    }
+    if (daily === '1' || daily === 'true') {
+      const data = this.quotesService.dailyOne()
+      return { ok: true, data }
+    }
+    const term = q?.trim()
+    if (term) {
+      const data = this.quotesService.search(term)
       return { ok: true, data }
     }
     const data = this.quotesService.listGrouped()

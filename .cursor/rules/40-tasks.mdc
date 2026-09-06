@@ -18,12 +18,14 @@ alwaysApply: false
 - [x] **T3** `types/event.ts` 前后端共用类型
 - [x] **T4** 后端 CRUD（POST 幂等 + GET 分页）
 - [x] **T5** 响应式骨架：电脑端侧边栏 + 手机端 TabBar（断点 ≥1024 / <768）
-- [x] **T6** 录入页：场景卡片组件（读 config，按 count 排序）
-- [x] **T7** 录入页：chips + 字段表单 + 记住上次的记录人/地点
+- [x] **T6** 录入页：场景卡片组件（读 config，按 count / 拖拽排序；**v3 类型入口卡**）
+- [x] **T7** 录入页：chips + 字段表单 + 记住上次记录人（**仅爸妈**）/ 地点
 - [x] **T8** 离线队列：IndexedDB 封装 + 失败存本地 + 启动时重放
-- [x] **T9** 时间线页：月份导航 + 事件流 + 类型筛选 + 右侧抽屉详情
+- [x] **T9** 时间线页：月份导航 + 事件流 + 类型筛选 + 右侧抽屉详情（可删）
 - [x] **T10** PWA manifest + 图标（192/512）；SW 配置写好但**默认关闭**
 - [ ] **T11** 部署到 1Panel（IP + HTTP + Basic Auth），电脑端实测浏览 + 手机端实测录入耗时
+
+> 阶段二/三进度见 `45-phase2-analytics.mdc`、`46-phase3-album.mdc`、`47-skills-map.mdc`、`48-ai-consult.mdc`。
 
 ## 渺言妙语（语录模块）
 

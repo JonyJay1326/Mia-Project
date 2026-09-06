@@ -54,3 +54,13 @@ export function stringifyJsonArray(
   }
   return JSON.stringify(value)
 }
+
+/** 东八区日历日 YYYY-MM-DD（今日一句等按天稳定选取） */
+export function chinaDayKey(at = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(at)
+}

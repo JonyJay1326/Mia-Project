@@ -39,6 +39,8 @@ export interface SkillItem extends SkillDef {
   markedAt?: string | null
   note?: string | null
   monthAgeWhenMarked?: number | null
+  /** 用户添加的自定义技能 */
+  isCustom?: boolean
 }
 
 /** 按领域分组 */
