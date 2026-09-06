@@ -41,3 +41,4 @@ mia-release.tar.gz
 deploy/.env.deploy
 # 服务器 CI 上传目录（若误同步到本机）
 .ci-upload/
+*.pnpm-lock.yaml
